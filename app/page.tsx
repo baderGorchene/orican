@@ -680,12 +680,60 @@ export default function Home() {
         if (isFinite(t)) {
           video.currentTime = t;
         }
-        if (stageRef.current) {
-          stageRef.current.classList.toggle('title-hidden', progress > 0.08);
+
+        // Multi-phase text transitions driven by scroll progress
+        // Phase 0: 0.00 to 0.32
+        // Phase 1: 0.32 to 0.66
+        // Phase 2: 0.66 to 1.00
+        let activeIdx = 0;
+        if (progress >= 0.66) {
+          activeIdx = 2;
+        } else if (progress >= 0.32) {
+          activeIdx = 1;
+        } else {
+          activeIdx = 0;
         }
+
+        const stepEls = [
+          document.getElementById('stageStep0'),
+          document.getElementById('stageStep1'),
+          document.getElementById('stageStep2'),
+        ];
+        const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
+
+        stepEls.forEach((el, idx) => {
+          if (!el) return;
+          if (idx === activeIdx) {
+            el.classList.add('active');
+            el.classList.remove('exit');
+          } else if (idx < activeIdx) {
+            el.classList.remove('active');
+            el.classList.add('exit');
+          } else {
+            el.classList.remove('active');
+            el.classList.remove('exit');
+          }
+        });
+
+        indicatorDots.forEach((dot, idx) => {
+          dot.classList.toggle('active', idx === activeIdx);
+        });
+
         ticking = false;
       });
     }
+
+    const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
+    indicatorDots.forEach((dot) => {
+      dot.addEventListener('click', () => {
+        const stepTarget = parseInt(dot.getAttribute('data-step') || '0', 10);
+        if (!wrap) return;
+        const scrollable = wrap.offsetHeight - window.innerHeight;
+        const targetRatios = [0.06, 0.46, 0.82];
+        const targetScroll = wrap.offsetTop + scrollable * targetRatios[stepTarget];
+        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      });
+    });
 
     if (video) {
       video.muted = true;
@@ -763,14 +811,36 @@ export default function Home() {
           </header>
 
           <div className="stage-copy">
-            <h1 id="stageTitle"><span>Customize</span> <span>like a Pro</span></h1>
-            <p id="stageCaption">A live 3D layer between your file and the press &mdash; upload a design, place it, and see the exact shirt that gets printed.</p>
+            {/* Phase 1 */}
+            <div className="stage-step active" id="stageStep0">
+              <h1 id="stageTitle0"><span>Customize</span> <span>like a Pro</span></h1>
+              <p id="stageCaption0">A live 3D layer between your file and the press &mdash; upload a design, place it, and see the exact shirt that gets printed.</p>
+            </div>
+
+            {/* Phase 2 */}
+            <div className="stage-step" id="stageStep1">
+              <h1 id="stageTitle1"><span>Rotate &amp; Inspect</span> <span>in 360&deg;</span></h1>
+              <p id="stageCaption1">Spin the garment in real time, check natural fabric drape, and verify shadows before a single drop of ink touches cotton.</p>
+            </div>
+
+            {/* Phase 3 */}
+            <div className="stage-step" id="stageStep2">
+              <h1 id="stageTitle2"><span>Sub-Millimeter</span> <span>Print Registration</span></h1>
+              <p id="stageCaption2">Hardware-clipped print boundaries ensure your high-res art and vector files land precisely where you positioned them.</p>
+            </div>
+
+            {/* Step Indicators */}
+            <div className="stage-step-indicators" aria-label="Hero scrub sequence">
+              <button type="button" className="step-dot active" data-step="0" aria-label="Phase 1: Customize like a Pro" />
+              <button type="button" className="step-dot" data-step="1" aria-label="Phase 2: Rotate and Inspect" />
+              <button type="button" className="step-dot" data-step="2" aria-label="Phase 3: Sub-Millimeter Registration" />
+            </div>
           </div>
         </section>
       </div>
 
       <section style={{ background: '#050608', color: '#fff', padding: '0 0 48px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
-        <div className="wrap" style={{ display: 'flex', justifyContent: 'space-between', gap: '24px', paddingTop: '56px', flexWrap: 'wrap' }}>
+        <div className="wrap stats-bar-grid">
           <div>
             <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 600 }}>12K+</div>
             <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.55)', letterSpacing: '.03em' }}>PROOFS GENERATED</div>
@@ -791,7 +861,7 @@ export default function Home() {
       </section>
 
       <section style={{ background: '#0A0B0D', color: '#fff', padding: '64px 0', borderTop: '1px solid rgba(255,255,255,.1)' }}>
-        <div className="wrap" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
+        <div className="wrap live-studio-grid">
           <div style={{ position: 'relative', width: 'min(420px,100%)', aspectRatio: '1/1', justifySelf: 'center', border: '1px solid rgba(255,255,255,.16)', borderRadius: '12px', overflow: 'hidden', order: 1 }}>
             <canvas ref={miniCanvasRef} id="miniCanvas" style={{ width: '100%', height: '100%', display: 'block' }} />
           </div>
@@ -814,7 +884,7 @@ export default function Home() {
             <h2 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>Built for scrutiny</h2>
             <p style={{ color: 'rgba(255,255,255,.6)' }}>The white tee, up close &mdash; weave, stitching, and embroidery detail.</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '18px' }}>
+          <div className="scrutiny-grid">
             <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden' }}>
               <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_f9db9841-0a2f-47d8-a71f-6054f288935c.png" alt="Macro detail of embroidered logo on white cotton t-shirt" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
@@ -907,7 +977,7 @@ export default function Home() {
       <section style={{ position: 'relative', minHeight: '70vh', display: 'flex', alignItems: 'flex-end', background: "url('https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_081447_70ad87e7-29a2-4c17-94d6-02871420d66f.png') center/cover no-repeat" }}>
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, #050608 5%, rgba(5,6,8,.35) 55%, rgba(5,6,8,.1) 100%)' }} />
         <div className="wrap" style={{ position: 'relative', padding: '64px 40px 56px', color: '#fff' }}>
-          <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 600, fontSize: 'clamp(28px,4.5vw,52px)', letterSpacing: '-.02em', maxWidth: '640px', marginBottom: '16px', color: '#fff' }}>
+          <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 600, fontSize: 'clamp(28px,4.5vw,52px)', lineHeight: 1.25, letterSpacing: '-.02em', maxWidth: '640px', marginBottom: '22px', color: '#fff' }}>
             One proof. No surprises. The shirt you saw is the shirt you get.
           </h2>
           <button className="btn" id="storyCustomize" style={{ fontFamily: "'Manrope',sans-serif" }}>Start designing</button>
