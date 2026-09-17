@@ -10,14 +10,19 @@ import {
   MOVE_STEP,
   SHIRT_PATH_D,
   SHIRT_PATH_SIZE,
+  GARMENT_MODELS,
 } from './constants';
-import { ScreenRect, ShirtViewerInstance } from './types';
+import { GarmentModel, ScreenRect, ShirtViewerInstance } from './types';
 
-export function makePrintAreaClipTemplates(centerLocal: { x: number; y: number }): THREE.Plane[] {
-  const left = centerLocal.x - PRINT_HALF_W;
-  const right = centerLocal.x + PRINT_HALF_W;
-  const top = centerLocal.y + PRINT_HALF_H;
-  const bottom = centerLocal.y - PRINT_HALF_H;
+export function makePrintAreaClipTemplates(
+  centerLocal: { x: number; y: number },
+  printHalfW: number = PRINT_HALF_W,
+  printHalfH: number = PRINT_HALF_H
+): THREE.Plane[] {
+  const left = centerLocal.x - printHalfW;
+  const right = centerLocal.x + printHalfW;
+  const top = centerLocal.y + printHalfH;
+  const bottom = centerLocal.y - printHalfH;
 
   return [
     new THREE.Plane(new THREE.Vector3(1, 0, 0), -left),
@@ -27,17 +32,21 @@ export function makePrintAreaClipTemplates(centerLocal: { x: number; y: number }
   ];
 }
 
-export function drawShirt(
+export function drawGarment(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,
-  color: string
+  color: string,
+  model?: GarmentModel
 ): void {
   ctx.clearRect(0, 0, w, h);
 
-  const scale = Math.min((w * 0.94) / SHIRT_PATH_SIZE.w, (h * 0.94) / SHIRT_PATH_SIZE.h);
-  const dw = SHIRT_PATH_SIZE.w * scale;
-  const dh = SHIRT_PATH_SIZE.h * scale;
+  const pathD = model?.silhouettePath || SHIRT_PATH_D;
+  const pathSize = model?.pathSize || SHIRT_PATH_SIZE;
+
+  const scale = Math.min((w * 0.94) / pathSize.w, (h * 0.94) / pathSize.h);
+  const dw = pathSize.w * scale;
+  const dh = pathSize.h * scale;
   const dx = (w - dw) / 2;
   const dy = (h - dh) / 2;
 
@@ -45,22 +54,27 @@ export function drawShirt(
   ctx.translate(dx, dy);
   ctx.scale(scale, scale);
 
-  const path = new Path2D(SHIRT_PATH_D);
+  const path = new Path2D(pathD);
 
   // Fill garment color
   ctx.fillStyle = color;
   ctx.fill(path);
 
-  // Thin crisp outline
+  // Smooth studio outline
   ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(0.6, (w * 0.005) / scale);
-  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = Math.max(0.7, (w * 0.005) / scale);
+  ctx.strokeStyle = '#242C47';
   ctx.stroke(path);
 
   ctx.restore();
 }
 
-export function makeShirtTexture(color: string): {
+export const drawShirt = drawGarment;
+
+export function makeGarmentTexture(
+  color: string,
+  model?: GarmentModel
+): {
   tex: THREE.CanvasTexture;
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -69,7 +83,7 @@ export function makeShirtTexture(color: string): {
   canvas.width = 1024;
   canvas.height = 1280;
   const ctx = canvas.getContext('2d')!;
-  drawShirt(ctx, canvas.width, canvas.height, color);
+  drawGarment(ctx, canvas.width, canvas.height, color, model);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -77,14 +91,17 @@ export function makeShirtTexture(color: string): {
   return { tex, canvas, ctx };
 }
 
+export const makeShirtTexture = makeGarmentTexture;
+
 export interface ViewerOptions {
   color?: string;
+  model?: GarmentModel;
   exportable?: boolean;
   onScreenRectChange?: (rect: ScreenRect) => void;
   maskContainer?: HTMLElement | null;
 }
 
-export function createShirtViewer(
+export function createGarmentViewer(
   canvasEl: HTMLCanvasElement,
   opts: ViewerOptions = {}
 ): ShirtViewerInstance {
@@ -102,307 +119,78 @@ export function createShirtViewer(
   const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
   camera.position.set(0, 0, 6.2);
 
-  // Lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+  // Lighting setup
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.88);
   scene.add(ambientLight);
 
   const keyLight = new THREE.DirectionalLight(0xffffff, 0.95);
-  keyLight.position.set(2.5, 3, 4);
+  keyLight.position.set(2.5, 3.2, 4);
   scene.add(keyLight);
 
-  const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+  const fillLight = new THREE.DirectionalLight(0xffffff, 0.42);
   fillLight.position.set(-3, -1, 2);
   scene.add(fillLight);
 
+  let currentModel: GarmentModel = opts.model || GARMENT_MODELS[0];
   let currentColor = opts.color || '#F6F4EE';
-  let shirtData = makeShirtTexture(currentColor);
+  let garmentData = makeGarmentTexture(currentColor, currentModel);
 
-  const geo = new THREE.PlaneGeometry(PLANE_WIDTH, PLANE_HEIGHT);
-  const shirtMat = new THREE.MeshBasicMaterial({
-    map: shirtData.tex,
+  let currentPlaneW = currentModel.planeWidth || PLANE_WIDTH;
+  let currentPlaneH = currentModel.planeHeight || PLANE_HEIGHT;
+  let geo = new THREE.PlaneGeometry(currentPlaneW, currentPlaneH);
+  const garmentMat = new THREE.MeshBasicMaterial({
+    map: garmentData.tex,
     transparent: true,
   });
-  const shirtMesh = new THREE.Mesh(geo, shirtMat);
-  scene.add(shirtMesh);
+  const garmentMesh = new THREE.Mesh(geo, garmentMat);
+  scene.add(garmentMesh);
 
   // Design Anchor
   const designAnchor = new THREE.Object3D();
-  designAnchor.position.set(PRINT_BASE_CENTER.x, PRINT_BASE_CENTER.y, 0.12);
+  designAnchor.position.set(currentModel.printZone.center.x, currentModel.printZone.center.y, 0.12);
   designAnchor.rotation.x = -0.08;
   scene.add(designAnchor);
 
-  // Fixed clipping planes
-  const clipPlanes = makePrintAreaClipTemplates(PRINT_BASE_CENTER);
+  // Dynamic clipping planes
+  let currentHalfW = (currentModel.printZone.wFrac * currentPlaneW) / 2;
+  let currentHalfH = (currentModel.printZone.hFrac * currentPlaneH) / 2;
+  let clipPlanes = makePrintAreaClipTemplates(currentModel.printZone.center, currentHalfW, currentHalfH);
 
-  // State
+  // Design Mesh State
   let designMesh: THREE.Mesh | null = null;
   let designSphereRadius = 0;
   let designBaseScale = 1;
   let designMultiplier = 1;
-  const designMinMultiplier = 0.15;
-  const designMaxMultiplier = 50;
+  const designMinMultiplier = 0.55;
+  const designMaxMultiplier = 1.95;
+  let pendingTextureImg: HTMLImageElement | null = null;
   let offsetX = 0;
   let offsetY = 0;
-  let pendingTextureImg: HTMLImageElement | null = null;
+
+  function redrawGarmentTexture() {
+    drawGarment(garmentData.ctx, garmentData.canvas.width, garmentData.canvas.height, currentColor, currentModel);
+    garmentData.tex.needsUpdate = true;
+  }
 
   function updateAnchorTransform() {
-    const clearanceRadius = designMesh
-      ? designSphereRadius * designBaseScale * designMultiplier
-      : 0;
+    const limits = {
+      x: Math.max(0.05, currentHalfW - 0.05),
+      y: Math.max(0.05, currentHalfH - 0.05),
+    };
+    offsetX = Math.max(-limits.x, Math.min(limits.x, offsetX));
+    offsetY = Math.max(-limits.y, Math.min(limits.y, offsetY));
     designAnchor.position.set(
-      PRINT_BASE_CENTER.x + offsetX,
-      PRINT_BASE_CENTER.y + offsetY,
-      0.02 + clearanceRadius + 0.06
+      currentModel.printZone.center.x + offsetX,
+      currentModel.printZone.center.y + offsetY,
+      0.12
     );
   }
 
-  function applyOffset(dxLocal: number, dyLocal: number) {
-    offsetX = Math.max(-MOVE_LIMITS.x, Math.min(MOVE_LIMITS.x, offsetX + dxLocal));
-    offsetY = Math.max(-MOVE_LIMITS.y, Math.min(MOVE_LIMITS.y, offsetY + dyLocal));
+  function applyOffset(dx: number, dy: number) {
+    offsetX += dx;
+    offsetY += dy;
     updateAnchorTransform();
   }
-
-  // Ground drop shadow
-  const shadowCanvas = document.createElement('canvas');
-  shadowCanvas.width = 256;
-  shadowCanvas.height = 128;
-  const sctx = shadowCanvas.getContext('2d')!;
-  const rg = sctx.createRadialGradient(128, 64, 10, 128, 64, 120);
-  rg.addColorStop(0, 'rgba(0,0,0,0.22)');
-  rg.addColorStop(1, 'rgba(0,0,0,0)');
-  sctx.fillStyle = rg;
-  sctx.fillRect(0, 0, 256, 128);
-
-  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-  const shadowMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.6, 1.8),
-    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true })
-  );
-  shadowMesh.rotation.x = -Math.PI / 2;
-  shadowMesh.position.y = -2.05;
-  scene.add(shadowMesh);
-
-  // DOM Mask bands (if container provided)
-  const maskContainer = opts.maskContainer || canvasEl.parentElement;
-  const maskBands: Record<string, HTMLDivElement> = {};
-  if (maskContainer) {
-    ['top', 'bottom', 'left', 'right'].forEach((key) => {
-      const band = document.createElement('div');
-      band.className = 'print-mask-band';
-      band.style.position = 'absolute';
-      band.style.pointerEvents = 'none';
-      band.style.zIndex = '2';
-      band.style.backgroundColor = 'rgba(101, 146, 197, 0.22)';
-      band.style.backdropFilter = 'blur(0.5px)';
-      maskContainer.appendChild(band);
-      maskBands[key] = band;
-    });
-  }
-
-  function computeScreenRect(w: number, h: number): ScreenRect {
-    camera.updateMatrixWorld();
-    const half = new THREE.Vector3(
-      PRINT_BASE_CENTER.x + PRINT_HALF_W,
-      PRINT_BASE_CENTER.y + PRINT_HALF_H,
-      0.02
-    );
-    const other = new THREE.Vector3(
-      PRINT_BASE_CENTER.x - PRINT_HALF_W,
-      PRINT_BASE_CENTER.y - PRINT_HALF_H,
-      0.02
-    );
-
-    half.project(camera);
-    other.project(camera);
-
-    const x1 = ((half.x + 1) / 2) * w;
-    const x2 = ((other.x + 1) / 2) * w;
-    const y1 = ((1 - half.y) / 2) * h;
-    const y2 = ((1 - other.y) / 2) * h;
-
-    const rect: ScreenRect = {
-      left: Math.min(x1, x2),
-      right: Math.max(x1, x2),
-      top: Math.min(y1, y2),
-      bottom: Math.max(y1, y2),
-    };
-
-    if (opts.onScreenRectChange) {
-      opts.onScreenRectChange(rect);
-    }
-    return rect;
-  }
-
-  function updateMask(w: number, h: number) {
-    if (!maskBands.top) return;
-    const { left, right, top, bottom } = computeScreenRect(w, h);
-
-    maskBands.top.style.cssText = `position:absolute;left:0px;top:0px;width:${w}px;height:${Math.max(
-      0,
-      top
-    )}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
-    maskBands.bottom.style.cssText = `position:absolute;left:0px;top:${bottom}px;width:${w}px;height:${Math.max(
-      0,
-      h - bottom
-    )}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
-    maskBands.left.style.cssText = `position:absolute;left:0px;top:${top}px;width:${Math.max(
-      0,
-      left
-    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
-    maskBands.right.style.cssText = `position:absolute;left:${right}px;top:${top}px;width:${Math.max(
-      0,
-      w - right
-    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
-  }
-
-  function renderPrintAreaCropCanvas(): HTMLCanvasElement {
-    renderer.render(scene, camera);
-    const w = canvasEl.clientWidth;
-    const h = canvasEl.clientHeight;
-    const rect = computeScreenRect(w, h);
-    const ratio = renderer.getPixelRatio();
-    const sx = rect.left * ratio;
-    const sy = rect.top * ratio;
-    const sw = Math.max(1, (rect.right - rect.left) * ratio);
-    const sh = Math.max(1, (rect.bottom - rect.top) * ratio);
-
-    const c = document.createElement('canvas');
-    c.width = Math.round(sw);
-    c.height = Math.round(sh);
-    const ctx = c.getContext('2d')!;
-    ctx.drawImage(renderer.domElement, sx, sy, sw, sh, 0, 0, c.width, c.height);
-    return c;
-  }
-
-  function renderFlatMockupCanvas(): HTMLCanvasElement {
-    const W = shirtData.canvas.width;
-    const H = shirtData.canvas.height;
-    const out = document.createElement('canvas');
-    out.width = W;
-    out.height = H;
-    const octx = out.getContext('2d')!;
-
-    octx.fillStyle = '#FFFFFF';
-    octx.fillRect(0, 0, W, H);
-    octx.drawImage(shirtData.canvas, 0, 0);
-
-    if (designMesh) {
-      const cropCanvas = renderPrintAreaCropCanvas();
-      const fracCenterX = 0.5 + PRINT_BASE_CENTER.x / PLANE_WIDTH;
-      const fracCenterY = 0.5 - PRINT_BASE_CENTER.y / PLANE_HEIGHT;
-      const pw = PRINT_SIZE.wFrac * W;
-      const ph = PRINT_SIZE.hFrac * H;
-      const px = fracCenterX * W - pw / 2;
-      const py = fracCenterY * H - ph / 2;
-      octx.drawImage(cropCanvas, px, py, pw, ph);
-    }
-    return out;
-  }
-
-  let lastW = 0;
-  let lastH = 0;
-
-  function resize() {
-    const w = canvasEl.clientWidth;
-    const h = canvasEl.clientHeight;
-    if (w === 0 || h === 0 || (w === lastW && h === lastH)) return;
-    lastW = w;
-    lastH = h;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    updateMask(w, h);
-  }
-
-  function redraw() {
-    drawShirt(shirtData.ctx, shirtData.canvas.width, shirtData.canvas.height, currentColor);
-    shirtData.tex.needsUpdate = true;
-  }
-
-  // Pointer interactions
-  const raycaster = new THREE.Raycaster();
-  const mouseVec = new THREE.Vector2();
-  let objectDrag = false;
-  let panDrag = false;
-  let lastX = 0;
-  let lastY = 0;
-
-  function hitDesignMesh(clientX: number, clientY: number): boolean {
-    if (!designMesh) return false;
-    const rect = canvasEl.getBoundingClientRect();
-    mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouseVec, camera);
-    return raycaster.intersectObject(designMesh).length > 0;
-  }
-
-  function onPointerDown(e: PointerEvent) {
-    if (e.button === 1) {
-      // Middle-click pan
-      e.preventDefault();
-      panDrag = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      canvasEl.style.cursor = 'move';
-      return;
-    }
-    if (hitDesignMesh(e.clientX, e.clientY)) {
-      objectDrag = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      canvasEl.style.cursor = 'grabbing';
-    }
-  }
-
-  function onAuxClick(e: MouseEvent) {
-    if (e.button === 1) e.preventDefault();
-  }
-
-  function onPointerMove(e: PointerEvent) {
-    if (panDrag) {
-      const rect = canvasEl.getBoundingClientRect();
-      const dxLocal = (e.clientX - lastX) * (PLANE_WIDTH / rect.width);
-      const dyLocal = -(e.clientY - lastY) * (PLANE_HEIGHT / rect.height);
-      lastX = e.clientX;
-      lastY = e.clientY;
-      applyOffset(dxLocal, dyLocal);
-      return;
-    }
-    if (!objectDrag || !designMesh) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    designMesh.rotation.y += dx * 0.012;
-    designMesh.rotation.x += dy * 0.012;
-    lastX = e.clientX;
-    lastY = e.clientY;
-  }
-
-  function onPointerUp() {
-    if (objectDrag || panDrag) {
-      canvasEl.style.cursor = 'grab';
-    }
-    objectDrag = false;
-    panDrag = false;
-  }
-
-  canvasEl.addEventListener('pointerdown', onPointerDown);
-  canvasEl.addEventListener('auxclick', onAuxClick);
-  window.addEventListener('pointermove', onPointerMove);
-  window.addEventListener('pointerup', onPointerUp);
-
-  let isDestroyed = false;
-  let animId: number;
-
-  function animate() {
-    if (isDestroyed) return;
-    animId = requestAnimationFrame(animate);
-    resize();
-    renderer.render(scene, camera);
-  }
-
-  animate();
-  window.addEventListener('resize', resize);
-  setTimeout(resize, 60);
 
   function applyTextureToMesh(img: HTMLImageElement) {
     if (!designMesh) return;
@@ -415,33 +203,355 @@ export function createShirtViewer(
     tex.magFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
 
-    (designMesh.material as THREE.MeshStandardMaterial).map = tex;
-    (designMesh.material as THREE.MeshStandardMaterial).color.set('#ffffff');
-    (designMesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+    const mat = designMesh.material as THREE.MeshStandardMaterial;
+    mat.map = tex;
+    mat.color.set('#ffffff');
+    mat.needsUpdate = true;
+  }
+
+  function centerGeometry(geometry: THREE.BufferGeometry) {
+    geometry.computeBoundingBox();
+    const box = geometry.boundingBox!;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+    geometry.computeBoundingSphere();
+  }
+
+  // Radial ground shadow
+  const shadowCanvas = document.createElement('canvas');
+  shadowCanvas.width = 256;
+  shadowCanvas.height = 256;
+  const sCtx = shadowCanvas.getContext('2d')!;
+  const grad = sCtx.createRadialGradient(128, 128, 10, 128, 128, 120);
+  grad.addColorStop(0, 'rgba(36, 44, 71, 0.22)');
+  grad.addColorStop(0.5, 'rgba(36, 44, 71, 0.08)');
+  grad.addColorStop(1, 'rgba(240, 238, 230, 0)');
+  sCtx.fillStyle = grad;
+  sCtx.fillRect(0, 0, 256, 256);
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
+  const shadowGeo = new THREE.PlaneGeometry(3.6, 1.2);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    map: shadowTex,
+    transparent: true,
+    depthWrite: false,
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.position.set(0, -1.95, 0.01);
+  scene.add(shadowMesh);
+
+  // DOM Print Boundary Mask Bands
+  const maskBands: {
+    top?: HTMLDivElement;
+    bottom?: HTMLDivElement;
+    left?: HTMLDivElement;
+    right?: HTMLDivElement;
+  } = {};
+
+  if (opts.maskContainer) {
+    const parent = opts.maskContainer;
+    ['top', 'bottom', 'left', 'right'].forEach((side) => {
+      const el = document.createElement('div');
+      el.className = `print-mask-band print-mask-${side}`;
+      el.style.position = 'absolute';
+      el.style.pointerEvents = 'none';
+      el.style.backgroundColor = 'rgba(240, 238, 230, 0.65)';
+      el.style.backdropFilter = 'blur(3px)';
+      el.style.setProperty('-webkit-backdrop-filter', 'blur(3px)');
+      el.style.zIndex = '15';
+      parent.appendChild(el);
+      maskBands[side as keyof typeof maskBands] = el;
+    });
+  }
+
+  function updateMaskDom(rect: ScreenRect) {
+    if (!opts.maskContainer) return;
+    const { top, bottom, left, right } = rect;
+
+    if (maskBands.top) {
+      maskBands.top.style.top = '0';
+      maskBands.top.style.left = '0';
+      maskBands.top.style.right = '0';
+      maskBands.top.style.height = `${Math.max(0, top)}px`;
+    }
+    if (maskBands.bottom) {
+      maskBands.bottom.style.top = `${bottom}px`;
+      maskBands.bottom.style.left = '0';
+      maskBands.bottom.style.right = '0';
+      maskBands.bottom.style.bottom = '0';
+    }
+    if (maskBands.left) {
+      maskBands.left.style.top = `${top}px`;
+      maskBands.left.style.left = '0';
+      maskBands.left.style.width = `${Math.max(0, left)}px`;
+      maskBands.left.style.height = `${Math.max(0, bottom - top)}px`;
+    }
+    if (maskBands.right) {
+      maskBands.right.style.top = `${top}px`;
+      maskBands.right.style.left = `${right}px`;
+      maskBands.right.style.right = '0';
+      maskBands.right.style.height = `${Math.max(0, bottom - top)}px`;
+    }
+  }
+
+  function getScreenCoords(centerLocal: { x: number; y: number }): ScreenRect {
+    const p1 = new THREE.Vector3(
+      centerLocal.x - currentHalfW,
+      centerLocal.y + currentHalfH,
+      0
+    );
+    const p2 = new THREE.Vector3(
+      centerLocal.x + currentHalfW,
+      centerLocal.y - currentHalfH,
+      0
+    );
+
+    p1.project(camera);
+    p2.project(camera);
+
+    const w = canvasEl.clientWidth;
+    const h = canvasEl.clientHeight;
+
+    const x1 = ((p1.x + 1) / 2) * w;
+    const y1 = ((-p1.y + 1) / 2) * h;
+    const x2 = ((p2.x + 1) / 2) * w;
+    const y2 = ((-p2.y + 1) / 2) * h;
+
+    return {
+      left: Math.min(x1, x2),
+      right: Math.max(x1, x2),
+      top: Math.min(y1, y2),
+      bottom: Math.max(y1, y2),
+    };
+  }
+
+  // Pointer Interaction
+  let isDragging = false;
+  let isPanning = false;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+
+  const onPointerDown = (e: PointerEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+      isPanning = true;
+      e.preventDefault();
+    } else if (e.button === 0) {
+      isDragging = true;
+    }
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+    canvasEl.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    if (!isDragging && !isPanning) return;
+    const dx = e.clientX - lastPointerX;
+    const dy = e.clientY - lastPointerY;
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+
+    if (isPanning) {
+      const panSpeed = 0.005;
+      applyOffset(dx * panSpeed, -dy * panSpeed);
+    } else if (isDragging && designMesh) {
+      designMesh.rotation.y += dx * 0.015;
+      designMesh.rotation.x += dy * 0.015;
+    }
+  };
+
+  const onPointerUp = (e: PointerEvent) => {
+    isDragging = false;
+    isPanning = false;
+    try {
+      canvasEl.releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const onAuxClick = (e: MouseEvent) => {
+    if (e.button === 1) e.preventDefault();
+  };
+
+  canvasEl.addEventListener('pointerdown', onPointerDown);
+  canvasEl.addEventListener('auxclick', onAuxClick);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+
+  function resize() {
+    const w = canvasEl.clientWidth;
+    const h = canvasEl.clientHeight;
+    if (w === 0 || h === 0) return;
+
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+
+    const screenRect = getScreenCoords(currentModel.printZone.center);
+    updateMaskDom(screenRect);
+    opts.onScreenRectChange?.(screenRect);
+  }
+
+  let animId = 0;
+  let isDestroyed = false;
+
+  function animate() {
+    if (isDestroyed) return;
+    animId = requestAnimationFrame(animate);
+
+    // Idle design breath
+    if (designMesh && !isDragging) {
+      designMesh.rotation.y += 0.003;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  resize();
+  animate();
+  window.addEventListener('resize', resize);
+
+  // Flat Composite Mockup Rendering (JPG)
+  function renderFlatMockupCanvas(): HTMLCanvasElement {
+    const compCanvas = document.createElement('canvas');
+    compCanvas.width = 1200;
+    compCanvas.height = 1500;
+    const cCtx = compCanvas.getContext('2d')!;
+
+    // Clean white studio backdrop
+    cCtx.fillStyle = '#FFFFFF';
+    cCtx.fillRect(0, 0, compCanvas.width, compCanvas.height);
+
+    // Garment silhouette
+    drawGarment(cCtx, compCanvas.width, compCanvas.height, currentColor, currentModel);
+
+    // Render design within print boundary
+    const snapCanvas = document.createElement('canvas');
+    snapCanvas.width = 512;
+    snapCanvas.height = 512;
+    const snapRenderer = new THREE.WebGLRenderer({
+      canvas: snapCanvas,
+      antialias: true,
+      alpha: true,
+      preserveDrawingBuffer: true,
+    });
+    snapRenderer.setSize(512, 512, false);
+    const snapCamera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+    snapCamera.position.set(0, 0, 4);
+
+    const snapScene = new THREE.Scene();
+    const snapLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    snapLight.position.set(1, 2, 3);
+    snapScene.add(snapLight);
+    snapScene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+    if (designMesh) {
+      const cloneMesh = designMesh.clone();
+      cloneMesh.material = (designMesh.material as THREE.Material).clone();
+      snapScene.add(cloneMesh);
+      snapRenderer.render(snapScene, snapCamera);
+
+      const zoneW = compCanvas.width * currentModel.printZone.wFrac;
+      const zoneH = compCanvas.height * currentModel.printZone.hFrac;
+      const zoneX = (compCanvas.width - zoneW) / 2 + (offsetX / currentHalfW) * (zoneW * 0.35);
+      const zoneY = (compCanvas.height - zoneH) / 2 - (offsetY / currentHalfH) * (zoneH * 0.35);
+
+      cCtx.drawImage(snapCanvas, zoneX, zoneY, zoneW, zoneH);
+      cloneMesh.geometry.dispose();
+      (cloneMesh.material as THREE.Material).dispose();
+    }
+    snapRenderer.dispose();
+
+    return compCanvas;
+  }
+
+  // Print-Area Crop File (Lossless PNG)
+  function renderPrintAreaCropCanvas(): HTMLCanvasElement {
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = 1024;
+    cropCanvas.height = 1024;
+    const crCtx = cropCanvas.getContext('2d')!;
+
+    crCtx.clearRect(0, 0, 1024, 1024);
+
+    if (designMesh) {
+      const snapRenderer = new THREE.WebGLRenderer({
+        canvas: cropCanvas,
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+      });
+      snapRenderer.setSize(1024, 1024, false);
+      const snapCamera = new THREE.PerspectiveCamera(30, 1, 0.1, 20);
+      snapCamera.position.set(0, 0, 3.8);
+
+      const snapScene = new THREE.Scene();
+      snapScene.add(new THREE.DirectionalLight(0xffffff, 1.2));
+      snapScene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+      const cloneMesh = designMesh.clone();
+      cloneMesh.material = (designMesh.material as THREE.Material).clone();
+      snapScene.add(cloneMesh);
+      snapRenderer.render(snapScene, snapCamera);
+      cloneMesh.geometry.dispose();
+      (cloneMesh.material as THREE.Material).dispose();
+      snapRenderer.dispose();
+    }
+
+    return cropCanvas;
   }
 
   return {
     setColor(c: string) {
       currentColor = c;
-      redraw();
+      redrawGarmentTexture();
     },
 
-    setDesignGeometry(geometry: THREE.BufferGeometry, color: string = '#6592C5') {
+    setGarmentModel(model: GarmentModel) {
+      currentModel = model;
+      currentPlaneW = model.planeWidth || PLANE_WIDTH;
+      currentPlaneH = model.planeHeight || PLANE_HEIGHT;
+
+      // Update geometry & canvas texture
+      geo.dispose();
+      geo = new THREE.PlaneGeometry(currentPlaneW, currentPlaneH);
+      garmentMesh.geometry = geo;
+      redrawGarmentTexture();
+
+      // Recalculate print boundaries & clipping planes
+      currentHalfW = (model.printZone.wFrac * currentPlaneW) / 2;
+      currentHalfH = (model.printZone.hFrac * currentPlaneH) / 2;
+      clipPlanes = makePrintAreaClipTemplates(model.printZone.center, currentHalfW, currentHalfH);
+
+      if (designMesh) {
+        (designMesh.material as THREE.MeshStandardMaterial).clippingPlanes = clipPlanes;
+      }
+
+      offsetX = 0;
+      offsetY = 0;
+      updateAnchorTransform();
+      resize();
+    },
+
+    getGarmentModel(): GarmentModel {
+      return currentModel;
+    },
+
+    setDesignGeometry(geometry: THREE.BufferGeometry, color?: string) {
       if (designMesh) {
         designAnchor.remove(designMesh);
         designMesh.geometry.dispose();
         (designMesh.material as THREE.Material).dispose();
       }
 
+      centerGeometry(geometry);
       const size = new THREE.Vector3();
-      geometry.boundingBox?.getSize(size);
+      geometry.boundingBox!.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
       const initialScale = 0.82 / maxDim;
 
       const mat = new THREE.MeshStandardMaterial({
-        color,
+        color: color || '#DD0072',
         roughness: 0.45,
-        metalness: 0.1,
+        metalness: 0.08,
         clippingPlanes: clipPlanes,
         clipShadows: true,
         side: THREE.DoubleSide,
@@ -484,6 +594,9 @@ export function createShirtViewer(
     resetPosition() {
       offsetX = 0;
       offsetY = 0;
+      if (designMesh) {
+        designMesh.rotation.set(0, 0, 0);
+      }
       updateAnchorTransform();
     },
 
@@ -511,7 +624,7 @@ export function createShirtViewer(
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
 
-      Object.values(maskBands).forEach((b) => b.remove());
+      Object.values(maskBands).forEach((b) => b?.remove());
 
       if (designMesh) {
         designMesh.geometry.dispose();
@@ -519,8 +632,8 @@ export function createShirtViewer(
       }
 
       geo.dispose();
-      shirtMat.dispose();
-      shirtData.tex.dispose();
+      garmentMat.dispose();
+      garmentData.tex.dispose();
       shadowMesh.geometry.dispose();
       (shadowMesh.material as THREE.Material).dispose();
       shadowTex.dispose();
@@ -528,3 +641,5 @@ export function createShirtViewer(
     },
   };
 }
+
+export const createShirtViewer = createGarmentViewer;

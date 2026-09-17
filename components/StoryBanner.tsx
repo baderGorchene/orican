@@ -40,10 +40,10 @@ export const StoryBanner: React.FC<StoryBannerProps> = ({ onOpenStudio }) => {
       >
         <h2
           style={{
-            fontFamily: 'var(--font-heading)',
-            fontWeight: 700,
-            fontSize: 'clamp(30px, 4.2vw, 54px)',
-            letterSpacing: '-0.025em',
+            fontFamily: 'var(--font-title)',
+            fontWeight: 400,
+            fontSize: 'clamp(32px, 4.6vw, 58px)',
+            letterSpacing: '0.01em',
             maxWidth: '680px',
             lineHeight: 1.15,
             marginBottom: '28px',

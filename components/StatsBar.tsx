@@ -37,7 +37,7 @@ export const StatsBar: React.FC = () => {
           >
             <div
               style={{
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-sans)',
                 fontSize: 'clamp(28px, 3.2vw, 42px)',
                 fontWeight: 700,
                 color: 'var(--ink)',

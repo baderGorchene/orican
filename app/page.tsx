@@ -1,1123 +1,1361 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import * as THREE from 'three';
+import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  Box,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  Layers,
+  Palette,
+  Rotate3d,
+  Scissors,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
+import { GARMENT_MODELS } from '@/lib/constants';
+import { GarmentCategory, ModelTier } from '@/lib/types';
+import { useLenis } from 'lenis/react';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-/* ============================================================
-   Shirt texture — vector shape traced into canvas
-   ============================================================ */
-const PLANE_WIDTH = 3.1, PLANE_HEIGHT = 3.875;
-const PRINT_SIZE = { wFrac: 0.30, hFrac: 0.26 };
-const PRINT_HALF_W = (PRINT_SIZE.wFrac * PLANE_WIDTH) / 2;
-const PRINT_HALF_H = (PRINT_SIZE.hFrac * PLANE_HEIGHT) / 2;
-const PRINT_BASE_CENTER = { x: 0, y: 0.29 };
-const MOVE_LIMITS = { x: PRINT_HALF_W - 0.05, y: PRINT_HALF_H - 0.05 };
-const MOVE_STEP = 0.16;
-
-function makePrintAreaClipTemplates(centerLocal: { x: number; y: number }) {
-  const left = centerLocal.x - PRINT_HALF_W;
-  const right = centerLocal.x + PRINT_HALF_W;
-  const top = centerLocal.y + PRINT_HALF_H;
-  const bottom = centerLocal.y - PRINT_HALF_H;
-  return [
-    new THREE.Plane(new THREE.Vector3(1, 0, 0), -left),
-    new THREE.Plane(new THREE.Vector3(-1, 0, 0), right),
-    new THREE.Plane(new THREE.Vector3(0, -1, 0), top),
-    new THREE.Plane(new THREE.Vector3(0, 1, 0), -bottom),
-  ];
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrollTrigger);
 }
 
-const SHIRT_PATH_D =
-  "M 121.8,23.38 C 96.7,36.08 74.5,47.88 72.4,49.58 C 66.2,54.58 62.9,60.38 30.6,122.68 L 0,181.88 L 0,192.58 L 0,203.28 L 4.2,207.28 C 7.5,210.38 20.3,216.98 58.5,235.38 L 108.5,259.58 L 109,372.48 C 109.5,484.78 109.5,485.48 111.6,490.08 C 114.3,495.88 119.3,501.58 124.9,505.18 L 129.4,507.98 L 254,507.98 L 378.6,507.98 L 383.1,505.18 C 388.7,501.58 393.7,495.88 396.4,490.08 C 398.5,485.48 398.5,484.78 399,372.58 L 399.5,259.58 L 449.5,235.48 C 487.9,216.88 500.5,210.38 503.8,207.28 L 508,203.28 L 508,192.58 L 508,181.88 L 477.3,122.68 C 444.8,59.88 441.9,54.68 436.1,49.88 C 434.1,48.28 411.6,36.38 386,23.48 L 339.5,-0.02 L 326.9,-0.02 C 319.9,-0.02 311.9,0.48 308.9,0.98 C 277.3,6.98 241.1,7.28 205.6,1.98 C 197.2,0.68 188.3,0.08 180.1,0.08 L 167.5,0.28 L 121.8,23.38 Z";
-const SHIRT_PATH_SIZE = { w: 508, h: 507.98 };
-
-function drawShirt(ctx: CanvasRenderingContext2D, w: number, h: number, color: string) {
-  ctx.clearRect(0, 0, w, h);
-  const scale = Math.min((w * 0.94) / SHIRT_PATH_SIZE.w, (h * 0.94) / SHIRT_PATH_SIZE.h);
-  const dw = SHIRT_PATH_SIZE.w * scale, dh = SHIRT_PATH_SIZE.h * scale;
-  const dx = (w - dw) / 2, dy = (h - dh) / 2;
-
-  ctx.save();
-  ctx.translate(dx, dy);
-  ctx.scale(scale, scale);
-  const path = new Path2D(SHIRT_PATH_D);
-  ctx.fillStyle = color;
-  ctx.fill(path);
-
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(0.5, (w * 0.005) / scale);
-  ctx.strokeStyle = '#000000';
-  ctx.stroke(path);
-  ctx.restore();
-}
-
-function makeShirtTexture(color: string) {
-  const c = document.createElement('canvas');
-  c.width = 512; c.height = 640;
-  const ctx = c.getContext('2d')!;
-  drawShirt(ctx, c.width, c.height, color);
-  const tex = new THREE.CanvasTexture(c);
-  tex.needsUpdate = true;
-  return { tex, canvas: c, ctx };
-}
-
-function parseOBJ(text: string) {
-  const vPositions: number[][] = [];
-  const vUVs: number[][] = [];
-  const outPositions: number[] = [];
-  const outUVs: number[] = [];
-  const indices: number[] = [];
-  const indexMap = new Map<string, number>();
-  let hasRealUVs = false;
-
-  function getIndex(vi: number, vti: number | null) {
-    const key = vi + '/' + (vti === null ? '' : vti);
-    let idx = indexMap.get(key);
-    if (idx !== undefined) return idx;
-    idx = outPositions.length / 3;
-    const p = vPositions[vi] || [0, 0, 0];
-    outPositions.push(p[0], p[1], p[2]);
-    if (vti !== null && vUVs[vti]) {
-      outUVs.push(vUVs[vti][0], vUVs[vti][1]);
-    } else {
-      outUVs.push(0, 0);
-    }
-    indexMap.set(key, idx);
-    return idx;
-  }
-
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.startsWith('v ')) {
-      const p = line.split(/\s+/);
-      vPositions.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
-    } else if (line.startsWith('vt ')) {
-      const p = line.split(/\s+/);
-      vUVs.push([parseFloat(p[1]), parseFloat(p[2] ?? 0)]);
-      hasRealUVs = true;
-    } else if (line.startsWith('f ')) {
-      const tokens = line.split(/\s+/).slice(1);
-      const faceIdx = tokens.map((tok) => {
-        const bits = tok.split('/');
-        let vi = parseInt(bits[0], 10);
-        if (vi < 0) vi = vPositions.length + vi + 1;
-        vi -= 1;
-        let vti: number | null = null;
-        if (bits[1] && bits[1] !== '') {
-          vti = parseInt(bits[1], 10);
-          if (vti < 0) vti = vUVs.length + vti + 1;
-          vti -= 1;
-        }
-        return getIndex(vi, vti);
-      });
-      for (let k = 1; k < faceIdx.length - 1; k++) {
-        indices.push(faceIdx[0], faceIdx[k], faceIdx[k + 1]);
-      }
-    }
-  }
-
-  if (outPositions.length === 0 || indices.length === 0) {
-    throw new Error('No readable geometry found in this .obj');
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(outPositions), 3));
-  geometry.setIndex(indices);
-
-  if (!hasRealUVs) {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < outPositions.length; i += 3) {
-      const x = outPositions[i], y = outPositions[i + 1];
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-    }
-    const spanX = maxX - minX || 1, spanY = maxY - minY || 1;
-    for (let i = 0, u = 0; i < outPositions.length; i += 3, u += 2) {
-      outUVs[u] = (outPositions[i] - minX) / spanX;
-      outUVs[u + 1] = (outPositions[i + 1] - minY) / spanY;
-    }
-  }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(outUVs), 2));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function centerGeometry(geometry: THREE.BufferGeometry) {
-  geometry.center();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-}
-
-function createViewer(canvasEl: HTMLCanvasElement, opts?: { color?: string; exportable?: boolean }) {
-  opts = opts || {};
-  const renderer = new THREE.WebGLRenderer({
-    canvas: canvasEl,
-    antialias: true,
-    alpha: true,
-    preserveDrawingBuffer: !!opts.exportable,
-  });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.localClippingEnabled = true;
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
-  camera.position.set(0, 0, 6.2);
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
-  keyLight.position.set(2.5, 3, 4);
-  scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
-  fillLight.position.set(-3, -1, 2);
-  scene.add(fillLight);
-
-  const state = {
-    color: opts.color || '#F6F4EE',
-    designMesh: null as THREE.Mesh | null,
-    designSphereRadius: 0,
-    designBaseScale: 1,
-    designMultiplier: 1,
-    designMinMultiplier: 0.15,
-    designMaxMultiplier: 50,
-    offsetX: 0,
-    offsetY: 0,
-    pendingTextureImg: null as HTMLImageElement | null,
-  };
-
-  const shirtData = makeShirtTexture(state.color);
-  const geo = new THREE.PlaneGeometry(3.1, 3.875);
-  const shirtMat = new THREE.MeshBasicMaterial({ map: shirtData.tex, transparent: true });
-  const shirtMesh = new THREE.Mesh(geo, shirtMat);
-  scene.add(shirtMesh);
-
-  const designAnchor = new THREE.Object3D();
-  designAnchor.position.set(PRINT_BASE_CENTER.x, PRINT_BASE_CENTER.y, 0.12);
-  designAnchor.rotation.x = -0.08;
-  scene.add(designAnchor);
-
-  const clipPlanes = makePrintAreaClipTemplates(PRINT_BASE_CENTER);
-
-  function updateAnchorTransform() {
-    const clearanceRadius = state.designMesh
-      ? state.designSphereRadius * state.designBaseScale * state.designMultiplier
-      : 0;
-    designAnchor.position.set(
-      PRINT_BASE_CENTER.x + state.offsetX,
-      PRINT_BASE_CENTER.y + state.offsetY,
-      0.02 + clearanceRadius + 0.06
-    );
-  }
-
-  function applyOffset(dxLocal: number, dyLocal: number) {
-    state.offsetX = Math.max(-MOVE_LIMITS.x, Math.min(MOVE_LIMITS.x, state.offsetX + dxLocal));
-    state.offsetY = Math.max(-MOVE_LIMITS.y, Math.min(MOVE_LIMITS.y, state.offsetY + dyLocal));
-    updateAnchorTransform();
-  }
-
-  const shadowCanvas = document.createElement('canvas');
-  shadowCanvas.width = 256; shadowCanvas.height = 128;
-  const sctx = shadowCanvas.getContext('2d')!;
-  const rg = sctx.createRadialGradient(128, 64, 10, 128, 64, 120);
-  rg.addColorStop(0, 'rgba(0,0,0,0.18)');
-  rg.addColorStop(1, 'rgba(0,0,0,0)');
-  sctx.fillStyle = rg;
-  sctx.fillRect(0, 0, 256, 128);
-  const shadowTex = new THREE.CanvasTexture(shadowCanvas);
-  const shadowMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.6, 1.8),
-    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true })
-  );
-  shadowMesh.rotation.x = -Math.PI / 2;
-  shadowMesh.position.y = -2.05;
-  scene.add(shadowMesh);
-
-  const maskContainer = canvasEl.parentElement!;
-  const maskBands: Record<string, HTMLDivElement> = {};
-  ['top', 'bottom', 'left', 'right'].forEach((key) => {
-    const band = document.createElement('div');
-    band.className = 'print-mask-band';
-    maskContainer.appendChild(band);
-    maskBands[key] = band;
-  });
-
-  function computeScreenRect(w: number, h: number) {
-    camera.updateMatrixWorld();
-    const half = new THREE.Vector3(PRINT_BASE_CENTER.x + PRINT_HALF_W, PRINT_BASE_CENTER.y + PRINT_HALF_H, 0.02);
-    const other = new THREE.Vector3(PRINT_BASE_CENTER.x - PRINT_HALF_W, PRINT_BASE_CENTER.y - PRINT_HALF_H, 0.02);
-    half.project(camera);
-    other.project(camera);
-    const x1 = ((half.x + 1) / 2) * w, x2 = ((other.x + 1) / 2) * w;
-    const y1 = ((1 - half.y) / 2) * h, y2 = ((1 - other.y) / 2) * h;
-    return {
-      left: Math.min(x1, x2), right: Math.max(x1, x2),
-      top: Math.min(y1, y2), bottom: Math.max(y1, y2),
-    };
-  }
-
-  function updateMask(w: number, h: number) {
-    const rect = computeScreenRect(w, h);
-    const { left, right, top, bottom } = rect;
-    maskBands.top.style.cssText = `left:0px;top:0px;width:${w}px;height:${Math.max(0, top)}px;`;
-    maskBands.bottom.style.cssText = `left:0px;top:${bottom}px;width:${w}px;height:${Math.max(0, h - bottom)}px;`;
-    maskBands.left.style.cssText = `left:0px;top:${top}px;width:${Math.max(0, left)}px;height:${Math.max(0, bottom - top)}px;`;
-    maskBands.right.style.cssText = `left:${right}px;top:${top}px;width:${Math.max(0, w - right)}px;height:${Math.max(0, bottom - top)}px;`;
-  }
-
-  function renderPrintAreaCropCanvas() {
-    renderer.render(scene, camera);
-    const w = canvasEl.clientWidth, h = canvasEl.clientHeight;
-    const rect = computeScreenRect(w, h);
-    const ratio = renderer.getPixelRatio();
-    const sx = rect.left * ratio, sy = rect.top * ratio;
-    const sw = Math.max(1, (rect.right - rect.left) * ratio);
-    const sh = Math.max(1, (rect.bottom - rect.top) * ratio);
-    const c = document.createElement('canvas');
-    c.width = Math.round(sw); c.height = Math.round(sh);
-    c.getContext('2d')!.drawImage(renderer.domElement, sx, sy, sw, sh, 0, 0, c.width, c.height);
-    return c;
-  }
-
-  function renderFlatMockupCanvas() {
-    const W = shirtData.canvas.width, H = shirtData.canvas.height;
-    const out = document.createElement('canvas');
-    out.width = W; out.height = H;
-    const octx = out.getContext('2d')!;
-    octx.fillStyle = '#FFFFFF';
-    octx.fillRect(0, 0, W, H);
-    octx.drawImage(shirtData.canvas, 0, 0);
-    if (state.designMesh) {
-      const cropCanvas = renderPrintAreaCropCanvas();
-      const fracCenterX = 0.5 + PRINT_BASE_CENTER.x / PLANE_WIDTH;
-      const fracCenterY = 0.5 - PRINT_BASE_CENTER.y / PLANE_HEIGHT;
-      const pw = PRINT_SIZE.wFrac * W, ph = PRINT_SIZE.hFrac * H;
-      const px = fracCenterX * W - pw / 2, py = fracCenterY * H - ph / 2;
-      octx.drawImage(cropCanvas, px, py, pw, ph);
-    }
-    return out;
-  }
-
-  let lastW = 0, lastH = 0;
-  function resize() {
-    const w = canvasEl.clientWidth, h = canvasEl.clientHeight;
-    if (w === 0 || h === 0 || (w === lastW && h === lastH)) return;
-    lastW = w; lastH = h;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-    updateMask(w, h);
-  }
-
-  function redraw() {
-    drawShirt(shirtData.ctx, shirtData.canvas.width, shirtData.canvas.height, state.color);
-    shirtData.tex.needsUpdate = true;
-  }
-
-  const raycaster = new THREE.Raycaster();
-  const mouseVec = new THREE.Vector2();
-  let objectDrag = false, panDrag = false, lastX = 0, lastY = 0;
-
-  function hitDesignMesh(clientX: number, clientY: number) {
-    if (!state.designMesh) return false;
-    const rect = canvasEl.getBoundingClientRect();
-    mouseVec.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    mouseVec.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    raycaster.setFromCamera(mouseVec, camera);
-    return raycaster.intersectObject(state.designMesh).length > 0;
-  }
-
-  canvasEl.addEventListener('pointerdown', (e) => {
-    if (e.button === 1) {
-      e.preventDefault();
-      panDrag = true;
-      lastX = e.clientX; lastY = e.clientY;
-      canvasEl.style.cursor = 'move';
-      return;
-    }
-    if (hitDesignMesh(e.clientX, e.clientY)) {
-      objectDrag = true;
-      lastX = e.clientX; lastY = e.clientY;
-      canvasEl.style.cursor = 'grabbing';
-    }
-  });
-  canvasEl.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
-  window.addEventListener('pointermove', (e) => {
-    if (panDrag) {
-      const rect = canvasEl.getBoundingClientRect();
-      const dxLocal = (e.clientX - lastX) * (PLANE_WIDTH / rect.width);
-      const dyLocal = -(e.clientY - lastY) * (PLANE_HEIGHT / rect.height);
-      lastX = e.clientX; lastY = e.clientY;
-      applyOffset(dxLocal, dyLocal);
-      return;
-    }
-    if (!objectDrag || !state.designMesh) return;
-    const dx = e.clientX - lastX, dy = e.clientY - lastY;
-    state.designMesh.rotation.y += dx * 0.012;
-    state.designMesh.rotation.x += dy * 0.012;
-    lastX = e.clientX; lastY = e.clientY;
-  });
-  window.addEventListener('pointerup', () => {
-    if (objectDrag || panDrag) canvasEl.style.cursor = 'grab';
-    objectDrag = false;
-    panDrag = false;
-  });
-
-  let isDestroyed = false;
-  let animId: number;
-  function animate() {
-    if (isDestroyed) return;
-    animId = requestAnimationFrame(animate);
-    resize();
-    renderer.render(scene, camera);
-  }
-  animate();
-  window.addEventListener('resize', resize);
-  setTimeout(resize, 50);
-
-  function applyTextureToMesh(img: HTMLImageElement) {
-    if (!state.designMesh) return;
-    const tex = new THREE.Texture(img);
-    tex.wrapS = THREE.ClampToEdgeWrapping;
-    tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.generateMipmaps = false;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.needsUpdate = true;
-    (state.designMesh.material as THREE.MeshStandardMaterial).map = tex;
-    (state.designMesh.material as THREE.MeshStandardMaterial).color.set('#ffffff');
-    (state.designMesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
-  }
-
-  return {
-    setColor(c: string) { state.color = c; redraw(); },
-    setDesignGeometry(geometry: THREE.BufferGeometry, color?: string) {
-      if (state.designMesh) {
-        designAnchor.remove(state.designMesh);
-        state.designMesh.geometry.dispose();
-        (state.designMesh.material as THREE.Material).dispose();
-      }
-      centerGeometry(geometry);
-      const size = new THREE.Vector3();
-      geometry.boundingBox!.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const initialScale = 0.82 / maxDim;
-
-      const mat = new THREE.MeshStandardMaterial({
-        color: color || '#DD0072', roughness: 0.5, metalness: 0.08,
-        clippingPlanes: clipPlanes, clipShadows: true, side: THREE.DoubleSide,
-      });
-      const mesh = new THREE.Mesh(geometry, mat);
-      mesh.scale.setScalar(initialScale);
-      designAnchor.add(mesh);
-
-      state.designMesh = mesh;
-      state.designBaseScale = initialScale;
-      state.designMultiplier = 1;
-      state.designSphereRadius = geometry.boundingSphere!.radius;
-      updateAnchorTransform();
-
-      if (state.pendingTextureImg) applyTextureToMesh(state.pendingTextureImg);
-    },
-    setDesignSize(t: number) {
-      if (!state.designMesh) return;
-      const clampedT = Math.max(0, Math.min(1, t));
-      const mult = state.designMinMultiplier * Math.pow(state.designMaxMultiplier / state.designMinMultiplier, clampedT);
-      state.designMultiplier = mult;
-      state.designMesh.scale.setScalar(state.designBaseScale * mult);
-      updateAnchorTransform();
-    },
-    moveDesign(dx: number, dy: number) { applyOffset(dx * MOVE_STEP, dy * MOVE_STEP); },
-    panDesign(dxLocal: number, dyLocal: number) { applyOffset(dxLocal, dyLocal); },
-    resetPosition() { state.offsetX = 0; state.offsetY = 0; updateAnchorTransform(); },
-    setDesignTexture(img: HTMLImageElement) {
-      state.pendingTextureImg = img;
-      if (state.designMesh) applyTextureToMesh(img);
-    },
-    exportMockupJPG() { return renderFlatMockupCanvas().toDataURL('image/jpeg', 0.92); },
-    exportPrintFileCrop() { return renderPrintAreaCropCanvas().toDataURL('image/png'); },
-    resize,
-    destroy() {
-      isDestroyed = true;
-      cancelAnimationFrame(animId);
-      window.removeEventListener('resize', resize);
-      Object.values(maskBands).forEach((b) => b.remove());
-      renderer.dispose();
-    },
-  };
-}
-
-export default function Home() {
-  const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const mainCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+export default function LandingPage() {
+  const lenis = useLenis();
+  const scrubCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrubWrapRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
 
-  const miniViewerRef = useRef<ReturnType<typeof createViewer> | null>(null);
-  const mainViewerRef = useRef<ReturnType<typeof createViewer> | null>(null);
+  // Category showcase active tab in landing page
+  const [activeCategory, setActiveCategory] = useState<GarmentCategory>('tops');
 
-  const stageStateRef = useRef({ color: '#F6F4EE', name: 'Canvas White' });
+  // Category tab switch smooth stagger
+  useEffect(() => {
+    const cards = document.querySelectorAll('#garments .garment-card');
+    if (cards.length > 0) {
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 16, scale: 0.98 },
+        { opacity: 1, y: 0, scale: 1, duration: 0.4, stagger: 0.05, ease: 'power2.out' }
+      );
+    }
+  }, [activeCategory]);
 
   useEffect(() => {
-    if (!miniCanvasRef.current || !mainCanvasRef.current) return;
-
-    const miniViewer = createViewer(miniCanvasRef.current, { color: '#F6F4EE' });
-    const mainViewer = createViewer(mainCanvasRef.current, { color: '#F6F4EE', exportable: true });
-    miniViewerRef.current = miniViewer;
-    mainViewerRef.current = mainViewer;
-
-    // Toast helper
-    const toast = document.getElementById('toast')!;
-    let toastTimeout: NodeJS.Timeout;
-    function showToast(msg: string, ms = 1800) {
-      toast.textContent = msg;
-      toast.classList.add('show');
-      clearTimeout(toastTimeout);
-      toastTimeout = setTimeout(() => toast.classList.remove('show'), ms);
-    }
-
-    const overlay = document.getElementById('overlay')!;
-    const frameEl = document.querySelector('.frame')!;
-    const sizeSlider = document.getElementById('sizeSlider') as HTMLInputElement;
-    let mockupDataUrl = '', cropDataUrl = '';
-
-    function downloadDataUrl(dataUrl: string, filename: string) {
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = filename;
-      link.click();
-    }
-
-    const nextBtn = document.getElementById('nextBtn')!;
-    const backToEditorBtn = document.getElementById('backToEditorBtn')!;
-    const closeResult = document.getElementById('closeResult')!;
-    const downloadMockupBtn = document.getElementById('downloadMockupBtn')!;
-    const downloadCropBtn = document.getElementById('downloadCropBtn')!;
-
-    const onNext = () => {
-      mockupDataUrl = mainViewer.exportMockupJPG();
-      cropDataUrl = mainViewer.exportPrintFileCrop();
-      (document.getElementById('mockupImg') as HTMLImageElement).src = mockupDataUrl;
-      (document.getElementById('cropImg') as HTMLImageElement).src = cropDataUrl;
-      frameEl.classList.add('showing-result');
-    };
-    const onBack = () => frameEl.classList.remove('showing-result');
-    const onDownloadMockup = () => {
-      downloadDataUrl(mockupDataUrl, 'shirt-mockup.jpg');
-      showToast('Mockup saved', 1600);
-    };
-    const onDownloadCrop = () => {
-      downloadDataUrl(cropDataUrl, 'print-file.png');
-      showToast('Print file saved', 1600);
-    };
-
-    nextBtn.addEventListener('click', onNext);
-    backToEditorBtn.addEventListener('click', onBack);
-    closeResult.addEventListener('click', onBack);
-    downloadMockupBtn.addEventListener('click', onDownloadMockup);
-    downloadCropBtn.addEventListener('click', onDownloadCrop);
-
-    const onSizeInput = () => {
-      const val = parseFloat(sizeSlider.value) / 100;
-      mainViewer.setDesignSize(val);
-      miniViewer.setDesignSize(val);
-    };
-    sizeSlider.addEventListener('input', onSizeInput);
-
-    const dpadButtons = document.querySelectorAll('.dpad button[data-dx]');
-    const onDpadClick = (btn: Element) => {
-      const dx = +btn.getAttribute('data-dx')!, dy = +btn.getAttribute('data-dy')!;
-      mainViewer.moveDesign(dx, dy);
-      miniViewer.moveDesign(dx, dy);
-    };
-    dpadButtons.forEach((b) => b.addEventListener('click', () => onDpadClick(b)));
-
-    const resetPosBtn = document.getElementById('resetPosBtn')!;
-    const onReset = () => {
-      mainViewer.resetPosition();
-      miniViewer.resetPosition();
-    };
-    resetPosBtn.addEventListener('click', onReset);
-
-    function openFrame(color?: string, name?: string) {
-      overlay.classList.add('open');
-      if (color) mainViewer.setColor(color);
-      if (name) document.getElementById('productName')!.textContent = name;
-      setTimeout(() => mainViewer.resize(), 60);
-    }
-
-    const stageCustomize = document.getElementById('stageCustomize');
-    const storyCustomize = document.getElementById('storyCustomize');
-    const thirdCustomize = document.getElementById('thirdCustomize');
-    const onStageCustom = () => openFrame(stageStateRef.current.color, stageStateRef.current.name);
-
-    stageCustomize?.addEventListener('click', onStageCustom);
-    storyCustomize?.addEventListener('click', onStageCustom);
-    thirdCustomize?.addEventListener('click', onStageCustom);
-
-    const openFrameBtns = document.querySelectorAll('.openFrame');
-    openFrameBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const color = btn.getAttribute('data-color') || undefined;
-        const name = btn.closest('.card')?.querySelector('.name')?.textContent || undefined;
-        openFrame(color, name);
-        document.querySelectorAll('#colorPicker .dot').forEach((d) =>
-          d.classList.toggle('active', d.getAttribute('data-color') === color)
-        );
-      });
-    });
-
-    const closeFrame = document.getElementById('closeFrame')!;
-    const onCloseFrame = () => {
-      overlay.classList.remove('open');
-      frameEl.classList.remove('showing-result');
-    };
-    closeFrame.addEventListener('click', onCloseFrame);
-
-    const onOverlayClick = (e: MouseEvent) => {
-      if (e.target === overlay) {
-        overlay.classList.remove('open');
-      }
-    };
-    overlay.addEventListener('click', onOverlayClick);
-
-    // Modal color picker
-    const modalDots = document.querySelectorAll('#colorPicker .dot');
-    modalDots.forEach((dot) => {
-      dot.addEventListener('click', () => {
-        modalDots.forEach((d) => d.classList.remove('active'));
-        dot.classList.add('active');
-        const c = dot.getAttribute('data-color')!;
-        mainViewer.setColor(c);
-        miniViewer.setColor(c);
-      });
-    });
-
-    // Size pills
-    const sizePills = document.querySelectorAll('#sizePicker .size-pill');
-    sizePills.forEach((p) => {
-      p.addEventListener('click', () => {
-        sizePills.forEach((x) => x.classList.remove('active'));
-        p.classList.add('active');
-      });
-    });
-
-    // Upload OBJ
-    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
-    const uploadBtn = document.getElementById('uploadBtn')!;
-    uploadBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      fileInput.click();
-    });
-    fileInput.addEventListener('click', (e) => e.stopPropagation());
-    fileInput.addEventListener('change', (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const geometry = parseOBJ(ev.target?.result as string);
-          mainViewer.setDesignGeometry(geometry.clone());
-          miniViewer.setDesignGeometry(geometry.clone());
-          showToast('3D design placed on proof', 1800);
-        } catch (err) {
-          showToast("Couldn't read that .obj — try a simpler export", 2400);
-        }
-      };
-      reader.readAsText(file);
-    });
-
-    // Upload Texture
-    const textureInput = document.getElementById('textureInput') as HTMLInputElement;
-    const textureBtn = document.getElementById('textureBtn')!;
-    textureBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      textureInput.click();
-    });
-    textureInput.addEventListener('click', (e) => e.stopPropagation());
-    textureInput.addEventListener('change', (e: any) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const img = new Image();
-      img.onload = () => {
-        mainViewer.setDesignTexture(img);
-        miniViewer.setDesignTexture(img);
-        showToast('Texture applied to design', 1800);
-      };
-      img.onerror = () => showToast("Couldn't read that image", 2000);
-      img.src = URL.createObjectURL(file);
-    });
-
-    // Hero color picker
-    const heroDots = document.querySelectorAll('#heroColorPicker .dot');
-    heroDots.forEach((dot) => {
-      dot.addEventListener('click', () => {
-        heroDots.forEach((d: any) => { d.style.borderColor = 'transparent'; });
-        (dot as HTMLElement).style.borderColor = '#fff';
-        const color = dot.getAttribute('data-color')!, name = dot.getAttribute('data-name')!;
-        stageStateRef.current.color = color;
-        stageStateRef.current.name = name;
-        miniViewer.setColor(color);
-      });
-    });
-
-    // Hero scroll scrub
+    // Hero scroll scrub using 270-frame image sequence + GSAP ScrollTrigger
     const wrap = scrubWrapRef.current;
-    const video = videoRef.current;
+    const canvas = scrubCanvasRef.current;
+    const TOTAL_FRAMES = 270;
+    const images: (HTMLImageElement | null)[] = new Array(TOTAL_FRAMES).fill(null);
+    let currentFrameIdx = 1;
 
-    let ready = false;
-    let ticking = false;
+    const getFrameUrl = (idx: number) =>
+      `/video/frame_${String(idx).padStart(3, '0')}.jpg`;
 
-    function onScroll() {
-      if (!wrap || !video || ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const rect = wrap.getBoundingClientRect();
-        const scrollable = wrap.offsetHeight - window.innerHeight;
-        const progress = scrollable > 0 ? Math.min(1, Math.max(0, -rect.top / scrollable)) : 0;
-        const dur = (video.duration && !isNaN(video.duration) && video.duration > 0) ? video.duration : 5.042;
-        const t = progress * dur;
-        if (isFinite(t)) {
-          video.currentTime = t;
-        }
+    function renderFrame(targetIndex: number) {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-        // Multi-phase text transitions driven by scroll progress
-        // Phase 0: 0.00 to 0.32
-        // Phase 1: 0.32 to 0.66
-        // Phase 2: 0.66 to 1.00
-        let activeIdx = 0;
-        if (progress >= 0.66) {
-          activeIdx = 2;
-        } else if (progress >= 0.32) {
-          activeIdx = 1;
-        } else {
-          activeIdx = 0;
-        }
-
-        const stepEls = [
-          document.getElementById('stageStep0'),
-          document.getElementById('stageStep1'),
-          document.getElementById('stageStep2'),
-        ];
-        const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
-
-        stepEls.forEach((el, idx) => {
-          if (!el) return;
-          if (idx === activeIdx) {
-            el.classList.add('active');
-            el.classList.remove('exit');
-          } else if (idx < activeIdx) {
-            el.classList.remove('active');
-            el.classList.add('exit');
-          } else {
-            el.classList.remove('active');
-            el.classList.remove('exit');
+      // Find best loaded frame: exact index or nearest loaded neighbour
+      let imgToDraw: HTMLImageElement | null = null;
+      const exact = images[targetIndex - 1];
+      if (exact && exact.complete && exact.naturalWidth > 0) {
+        imgToDraw = exact;
+      } else {
+        for (let offset = 1; offset < TOTAL_FRAMES; offset++) {
+          const down = targetIndex - 1 - offset;
+          if (down >= 0 && images[down]?.complete && images[down]!.naturalWidth > 0) {
+            imgToDraw = images[down];
+            break;
           }
-        });
+          const up = targetIndex - 1 + offset;
+          if (up < TOTAL_FRAMES && images[up]?.complete && images[up]!.naturalWidth > 0) {
+            imgToDraw = images[up];
+            break;
+          }
+        }
+      }
 
-        indicatorDots.forEach((dot, idx) => {
-          dot.classList.toggle('active', idx === activeIdx);
-        });
+      if (!imgToDraw) return;
 
-        ticking = false;
-      });
+      const w = canvas.width;
+      const h = canvas.height;
+      if (w === 0 || h === 0) return;
+
+      // High-performance cover fit
+      const imgW = imgToDraw.naturalWidth || 1280;
+      const imgH = imgToDraw.naturalHeight || 720;
+      const scale = Math.max(w / imgW, h / imgH);
+      const drawW = imgW * scale;
+      const drawH = imgH * scale;
+      const drawX = (w - drawW) / 2;
+      const drawY = (h - drawH) / 2;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(imgToDraw, drawX, drawY, drawW, drawH);
     }
 
-    const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
-    indicatorDots.forEach((dot) => {
-      dot.addEventListener('click', () => {
-        const stepTarget = parseInt(dot.getAttribute('data-step') || '0', 10);
-        if (!wrap) return;
-        const scrollable = wrap.offsetHeight - window.innerHeight;
-        const targetRatios = [0.06, 0.46, 0.82];
-        const targetScroll = wrap.offsetTop + scrollable * targetRatios[stepTarget];
-        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    function resizeCanvas() {
+      if (!canvas) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      const newW = Math.round(rect.width * dpr);
+      const newH = Math.round(rect.height * dpr);
+      if (canvas.width !== newW || canvas.height !== newH) {
+        canvas.width = newW;
+        canvas.height = newH;
+      }
+      renderFrame(currentFrameIdx);
+    }
+
+    function loadFrame(idx: number) {
+      if (idx < 1 || idx > TOTAL_FRAMES || images[idx - 1]) return;
+      const img = new Image();
+      img.src = getFrameUrl(idx);
+      img.onload = () => {
+        images[idx - 1] = img;
+        if (currentFrameIdx === idx || !canvas?.width) {
+          if (!canvas?.width) resizeCanvas();
+          renderFrame(currentFrameIdx);
+        }
+      };
+    }
+
+    // Step 1: Load first frame immediately and render it
+    loadFrame(1);
+
+    // Step 2: Progressive preloading
+    for (let i = 2; i <= Math.min(20, TOTAL_FRAMES); i++) {
+      loadFrame(i);
+    }
+    for (let i = 21; i <= TOTAL_FRAMES; i += 6) {
+      loadFrame(i);
+    }
+
+    // Step 3: Background load the remainder
+    const preloadTimer = setTimeout(() => {
+      for (let i = 1; i <= TOTAL_FRAMES; i++) {
+        loadFrame(i);
+      }
+    }, 150);
+
+    resizeCanvas();
+
+    // GSAP Context with automatic scoping and cleanup
+    const ctx = gsap.context(() => {
+      if (!wrap) return;
+
+      // 1. Hero 270-frame scrub with sub-frame inertia
+      ScrollTrigger.create({
+        trigger: wrap,
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 0.5,
+        onUpdate: (self) => {
+          const p = self.progress;
+          const frameIdx = Math.min(
+            TOTAL_FRAMES,
+            Math.max(1, Math.round(p * (TOTAL_FRAMES - 1)) + 1)
+          );
+          if (frameIdx !== currentFrameIdx) {
+            currentFrameIdx = frameIdx;
+            renderFrame(frameIdx);
+          }
+        },
+      });
+
+      // 2. Ambient angle matching across subsequent sections
+      ScrollTrigger.create({
+        trigger: '#statsSection',
+        start: 'top bottom',
+        end: 'bottom bottom',
+        scrub: 1.0,
+        onUpdate: (self) => {
+          if (window.scrollY > wrap.offsetHeight * 0.85) {
+            const p = self.progress;
+            let frameIdx = 1;
+            if (p < 0.35) {
+              frameIdx = Math.round(270 - (p / 0.35) * (270 - 1));
+            } else if (p < 0.65) {
+              frameIdx = Math.round(1 + ((p - 0.35) / 0.3) * (68 - 1));
+            } else if (p < 0.85) {
+              frameIdx = Math.round(68 - ((p - 0.65) / 0.2) * (68 - 1));
+            } else {
+              frameIdx = Math.round(1 + ((p - 0.85) / 0.15) * (215 - 1));
+            }
+            frameIdx = Math.min(TOTAL_FRAMES, Math.max(1, frameIdx));
+            currentFrameIdx = frameIdx;
+            renderFrame(frameIdx);
+          }
+        },
+      });
+
+      // 3. Multi-phase hero narrative typography choreography
+      const step0 = document.getElementById('stageStep0');
+      const step1 = document.getElementById('stageStep1');
+      const step2 = document.getElementById('stageStep2');
+      const dots = document.querySelectorAll('.stage-step-indicators .step-dot');
+
+      if (step0 && step1 && step2) {
+        gsap.set(step0, { autoAlpha: 1, y: 0, filter: 'blur(0px)' });
+        gsap.set([step1, step2], { autoAlpha: 0, y: 28, filter: 'blur(12px)' });
+
+        const stageTl = gsap.timeline({
+          scrollTrigger: {
+            trigger: wrap,
+            start: 'top top',
+            end: 'bottom bottom',
+            scrub: 0.5,
+            onUpdate: (self) => {
+              const p = self.progress;
+              const activeDot = p >= 0.64 ? 2 : p >= 0.30 ? 1 : 0;
+              dots.forEach((dot, idx) => {
+                dot.classList.toggle('active', idx === activeDot);
+              });
+            },
+          },
+        });
+
+        // Phase 0: Holds until 0.26, then dissolves upward
+        stageTl.to(
+          step0,
+          {
+            autoAlpha: 0,
+            y: -26,
+            filter: 'blur(10px)',
+            ease: 'power2.inOut',
+            duration: 0.08,
+          },
+          0.26
+        );
+
+        // Phase 1: Enters from below 0.30 to 0.38
+        stageTl.fromTo(
+          step1,
+          { autoAlpha: 0, y: 26, filter: 'blur(10px)' },
+          {
+            autoAlpha: 1,
+            y: 0,
+            filter: 'blur(0px)',
+            ease: 'power2.inOut',
+            duration: 0.08,
+          },
+          0.30
+        );
+
+        // Phase 1: Dissolves upward 0.58 to 0.66
+        stageTl.to(
+          step1,
+          {
+            autoAlpha: 0,
+            y: -26,
+            filter: 'blur(10px)',
+            ease: 'power2.inOut',
+            duration: 0.08,
+          },
+          0.58
+        );
+
+        // Phase 2: Enters from below 0.62 to 0.70
+        stageTl.fromTo(
+          step2,
+          { autoAlpha: 0, y: 26, filter: 'blur(10px)' },
+          {
+            autoAlpha: 1,
+            y: 0,
+            filter: 'blur(0px)',
+            ease: 'power2.inOut',
+            duration: 0.08,
+          },
+          0.62
+        );
+      }
+
+      // 4. Scroll-triggered section reveals
+      document.querySelectorAll('.scroll-reveal-section').forEach((sec) => {
+        ScrollTrigger.create({
+          trigger: sec,
+          start: 'top 86%',
+          once: true,
+          onEnter: () => sec.classList.add('is-revealed'),
+        });
+      });
+
+      // 5. Tactile magnetic button hover micro-interactions
+      const magneticTargets = document.querySelectorAll('.stage-try, .btn-magnetic');
+      magneticTargets.forEach((btn) => {
+        const el = btn as HTMLElement;
+        const xTo = gsap.quickTo(el, 'x', { duration: 0.35, ease: 'power2.out' });
+        const yTo = gsap.quickTo(el, 'y', { duration: 0.35, ease: 'power2.out' });
+
+        const onMouseMove = (e: MouseEvent) => {
+          const rect = el.getBoundingClientRect();
+          const relX = e.clientX - (rect.left + rect.width / 2);
+          const relY = e.clientY - (rect.top + rect.height / 2);
+          xTo(relX * 0.2);
+          yTo(relY * 0.2);
+        };
+
+        const onMouseLeave = () => {
+          gsap.to(el, { x: 0, y: 0, duration: 0.6, ease: 'elastic.out(1, 0.4)' });
+        };
+
+        el.addEventListener('mousemove', onMouseMove);
+        el.addEventListener('mouseleave', onMouseLeave);
       });
     });
 
-    if (video) {
-      video.muted = true;
-      video.defaultMuted = true;
-      video.playsInline = true;
-
-      const markReady = () => {
-        ready = true;
-        onScroll();
-      };
-
-      if (video.readyState >= 1 || (video.duration && !isNaN(video.duration) && video.duration > 0)) {
-        markReady();
+    // Step dots navigation click
+    const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
+    const handleDotClick = (e: Event) => {
+      const dot = e.currentTarget as HTMLElement;
+      const stepTarget = parseInt(dot.getAttribute('data-step') || '0', 10);
+      if (!wrap) return;
+      const scrollable = wrap.offsetHeight - window.innerHeight;
+      const targetRatios = [0.06, 0.46, 0.82];
+      const targetScroll = wrap.offsetTop + scrollable * targetRatios[stepTarget];
+      if (lenis) {
+        lenis.scrollTo(targetScroll, { duration: 1.2 });
       } else {
-        video.addEventListener('loadedmetadata', markReady);
-        video.addEventListener('loadeddata', markReady);
-        video.addEventListener('canplay', markReady);
+        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
       }
+    };
 
-      // Convert video to in-memory Blob URL for instantaneous, 60fps scrubbing without network lag
-      fetch('/video/hero-scrub.mp4')
-        .then((res) => res.blob())
-        .then((blob) => {
-          if (!video) return;
-          const blobUrl = URL.createObjectURL(blob);
-          const currentT = video.currentTime;
-          video.src = blobUrl;
-          video.currentTime = currentT;
-          markReady();
-        })
-        .catch(() => {});
+    indicatorDots.forEach((dot) => {
+      dot.addEventListener('click', handleDotClick);
+    });
 
-      video.load();
-    }
+    const handleResize = () => {
+      resizeCanvas();
+      ScrollTrigger.refresh();
+    };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    onScroll();
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      miniViewer.destroy();
-      mainViewer.destroy();
+      clearTimeout(preloadTimer);
+      indicatorDots.forEach((dot) => {
+        dot.removeEventListener('click', handleDotClick);
+      });
+      window.removeEventListener('resize', handleResize);
+      ctx.revert();
     };
-  }, []);
+  }, [lenis]);
+
+  // Filter models for category showcase
+  const categoryModels = GARMENT_MODELS.filter(
+    (m) => m.category === activeCategory
+  );
 
   return (
     <>
-      <div className="scrub-wrap" id="scrubWrap" ref={scrubWrapRef} style={{ position: 'relative', height: '300vh' }}>
-        <section className="stage" ref={stageRef} style={{ position: 'sticky', top: 0 }}>
-          <video
-            ref={videoRef}
-            id="heroScrubVideo"
-            src="/video/hero-scrub.mp4"
-            muted
-            playsInline
-            preload="auto"
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}
-          />
-          <header className="stage-header">
-            <a className="stage-brand" href="#" aria-label="Orican home">
-              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="16" cy="16" r="14" stroke="#fff" strokeWidth="1.6" />
-                <path d="M16 4v24M4 16h24" stroke="#fff" strokeWidth="1.6" />
-                <circle cx="16" cy="16" r="4" fill="#fff" />
-              </svg>
-              <span className="stage-brand__name">ORICAN</span>
-            </a>
-            <div className="stage-meta">
-              <span>Live 3D proofing</span>
-              <span>See it before it prints</span>
-            </div>
-            <button className="stage-try" id="stageCustomize">Customize a tee</button>
-          </header>
+      {/* FULL-PAGE AMBIENT 3D SCRUB PARALLAX BACKDROP */}
+      <div className="ambient-scrub-backdrop" id="ambientScrubBackdrop">
+        <canvas
+          ref={scrubCanvasRef}
+          id="heroScrubCanvas"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+        <div className="ambient-vignette" />
+      </div>
 
-          <div className="stage-copy">
-            {/* Phase 1 */}
-            <div className="stage-step active" id="stageStep0">
-              <h1 id="stageTitle0"><span>Customize</span> <span>like a Pro</span></h1>
-              <p id="stageCaption0">A live 3D layer between your file and the press &mdash; upload a design, place it, and see the exact shirt that gets printed.</p>
-            </div>
+      {/* SCROLLING CONTENT LAYER */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {/* ================= HERO PINNED SCRUB SECTION ================= */}
+        <div
+          className="scrub-wrap"
+          id="scrubWrap"
+          ref={scrubWrapRef}
+          style={{ position: 'relative', height: '300vh' }}
+        >
+          <section className="stage" ref={stageRef} style={{ position: 'sticky', top: 0 }}>
+            <header className="stage-header" id="stageHeader">
+              <Link className="stage-brand" id="stageBrand" href="/" aria-label="ORICAN Home">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="16" cy="16" r="14" stroke="var(--blue)" strokeWidth="1.8" />
+                  <path d="M16 4v24M4 16h24" stroke="var(--ink)" strokeWidth="1.5" strokeOpacity="0.8" />
+                  <circle cx="16" cy="16" r="4" fill="var(--blue)" />
+                </svg>
+                <span className="stage-brand__name">ORICAN</span>
+              </Link>
 
-            {/* Phase 2 */}
-            <div className="stage-step" id="stageStep1">
-              <h1 id="stageTitle1"><span>Rotate &amp; Inspect</span> <span>in 360&deg;</span></h1>
-              <p id="stageCaption1">Spin the garment in real time, check natural fabric drape, and verify shadows before a single drop of ink touches cotton.</p>
-            </div>
+              <div className="stage-meta" id="stageMeta">
+                <span id="stageMeta1">
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--blue)',
+                      boxShadow: '0 0 8px var(--blue)',
+                      display: 'inline-block',
+                    }}
+                  />
+                  Live 3D Press Engine
+                </span>
+                <span id="stageMeta2">What you design is what gets printed</span>
+              </div>
 
-            {/* Phase 3 */}
-            <div className="stage-step" id="stageStep2">
-              <h1 id="stageTitle2"><span>Sub-Millimeter</span> <span>Print Registration</span></h1>
-              <p id="stageCaption2">Hardware-clipped print boundaries ensure your high-res art and vector files land precisely where you positioned them.</p>
-            </div>
+              <Link href="/studio" className="stage-try" id="stageCustomize">
+                <span>Launch 3D Studio</span>
+                <ArrowRight size={14} style={{ marginLeft: '6px' }} />
+              </Link>
+            </header>
 
-            {/* Step Indicators */}
-            <div className="stage-step-indicators" aria-label="Hero scrub sequence">
-              <button type="button" className="step-dot active" data-step="0" aria-label="Phase 1: Customize like a Pro" />
-              <button type="button" className="step-dot" data-step="1" aria-label="Phase 2: Rotate and Inspect" />
-              <button type="button" className="step-dot" data-step="2" aria-label="Phase 3: Sub-Millimeter Registration" />
+            {/* Narrative Storytelling Prompts Across Scroll Scrub */}
+            <div className="stage-copy">
+              {/* Prompt 1 */}
+              <div className="stage-step active" id="stageStep0">
+                <h1 id="stageTitle0">
+                  <span>Customize</span> <span>like a Pro</span>
+                </h1>
+                <p id="stageCaption0">
+                  A real-time 3D simulation bridge connecting digital 3D meshes &amp; vector art directly to industrial screen print and DTG presses.
+                </p>
+                <div style={{ marginTop: '28px', pointerEvents: 'auto' }}>
+                  <Link
+                    href="/studio"
+                    className="btn btn-primary"
+                    style={{
+                      borderRadius: '999px',
+                      padding: '12px 28px',
+                      fontSize: '14px',
+                      boxShadow: '0 8px 24px rgba(36, 44, 71, 0.18)',
+                    }}
+                  >
+                    <Sparkles size={16} color="#6592C5" />
+                    <span>Enter 3D Studio &mdash; Try It Free</span>
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Prompt 2 */}
+              <div className="stage-step" id="stageStep1">
+                <h1 id="stageTitle1">
+                  <span>Rotate &amp; Inspect</span> <span>in 360&deg;</span>
+                </h1>
+                <p id="stageCaption1">
+                  Audit garment drape, studio lighting, and seam interactions from every angle before a single drop of ink touches fabric.
+                </p>
+                <div style={{ marginTop: '28px', pointerEvents: 'auto' }}>
+                  <Link
+                    href="/studio"
+                    className="btn btn-secondary"
+                    style={{
+                      borderRadius: '999px',
+                      padding: '12px 28px',
+                      fontSize: '14px',
+                      boxShadow: '0 8px 24px rgba(36, 44, 71, 0.12)',
+                    }}
+                  >
+                    <Rotate3d size={16} color="#6592C5" />
+                    <span>Test 360&deg; Garment Viewport</span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Prompt 3 */}
+              <div className="stage-step" id="stageStep2">
+                <h1 id="stageTitle2">
+                  <span>Beyond T-Shirts</span> <span>Pants, Hoodies &amp; Jackets</span>
+                </h1>
+                <p id="stageCaption2">
+                  Extend your apparel line across full silhouettes with hardware-enforced print boundaries that guarantee zero press head strikes.
+                </p>
+                <div style={{ marginTop: '28px', pointerEvents: 'auto' }}>
+                  <Link
+                    href="/studio"
+                    className="btn btn-primary"
+                    style={{
+                      borderRadius: '999px',
+                      padding: '12px 28px',
+                      fontSize: '14px',
+                      boxShadow: '0 8px 24px rgba(36, 44, 71, 0.18)',
+                    }}
+                  >
+                    <span>Try Multi-Garment Studio</span>
+                    <ArrowRight size={15} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Step Navigation Dots */}
+              <div className="stage-step-indicators" aria-label="Hero scrub phases">
+                <button
+                  type="button"
+                  className="step-dot active"
+                  data-step="0"
+                  aria-label="Phase 1: Customize like a Pro"
+                />
+                <button
+                  type="button"
+                  className="step-dot"
+                  data-step="1"
+                  aria-label="Phase 2: Rotate and Inspect"
+                />
+                <button
+                  type="button"
+                  className="step-dot"
+                  data-step="2"
+                  aria-label="Phase 3: Extended Garment Proofing"
+                />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* ================= 1. STATS METRICS BAR ================= */}
+        <section
+          className="scroll-reveal-section glass-section-surface"
+          id="statsSection"
+          style={{ color: 'var(--ink)', padding: '36px 0 44px' }}
+        >
+          <div className="wrap stats-bar-grid">
+            <div className="stagger-item" style={{ '--item-idx': 0 } as React.CSSProperties}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>
+                12K+
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>
+                PROOFS GENERATED
+              </div>
+            </div>
+            <div className="stagger-item" style={{ '--item-idx': 1 } as React.CSSProperties}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>
+                4.9 / 5.0
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>
+                PRESS OPERATOR RATING
+              </div>
+            </div>
+            <div className="stagger-item" style={{ '--item-idx': 2 } as React.CSSProperties}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>
+                98%
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>
+                FIRST-RUN ACCURACY
+              </div>
+            </div>
+            <div className="stagger-item" style={{ '--item-idx': 3 } as React.CSSProperties}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>
+                Zero Misprints
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>
+                HARDWARE CLIPPED ZONES
+              </div>
             </div>
           </div>
         </section>
-      </div>
 
-      <section style={{ background: 'var(--paper-surface)', color: 'var(--ink)', padding: '0 0 48px', borderTop: '1.5px solid var(--line)' }}>
-        <div className="wrap stats-bar-grid">
-          <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>12K+</div>
-            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>PROOFS GENERATED</div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>4.9</div>
-            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>AVERAGE RATING</div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>98%</div>
-            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>FIRST-PRINT ACCURACY</div>
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>24h</div>
-            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>TURNAROUND</div>
-          </div>
-        </div>
-      </section>
-
-      <section style={{ background: 'var(--paper)', color: 'var(--ink)', padding: '64px 0', borderTop: '1.5px solid var(--line)' }}>
-        <div className="wrap live-studio-grid">
-          <div style={{ position: 'relative', width: 'min(420px,100%)', aspectRatio: '1/1', justifySelf: 'center', border: '1.5px solid var(--blue)', borderRadius: '12px', overflow: 'hidden', order: 1, background: 'var(--white)', boxShadow: '0 16px 36px -12px rgba(36,44,71,.14)' }}>
-            <canvas ref={miniCanvasRef} id="miniCanvas" style={{ width: '100%', height: '100%', display: 'block' }} />
-          </div>
-          <div style={{ order: 2 }}>
-            <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '8px' }}>
-              LIVE PROOFING PREVIEW
-            </div>
-            <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontSize: 'clamp(26px,3.4vw,38px)', fontWeight: 700, marginBottom: '14px' }}>Design it live, right here</h2>
-            <p style={{ color: 'var(--ink-soft)', fontSize: '14px', lineHeight: 1.7, maxWidth: '38ch', marginBottom: '24px' }}>Pick a garment color and watch it update in real time &mdash; this is the same live preview you'll use to place your own design.</p>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }} id="heroColorPicker">
-              <div className="dot active" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2.5px solid var(--blue)', background: '#F6F4EE', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#F6F4EE" data-name="Canvas White" />
-              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid rgba(101,146,197,.3)', background: '#1B1C1E', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#1B1C1E" data-name="Ink Black" />
-              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid rgba(101,146,197,.3)', background: '#CBA97A', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#CBA97A" data-name="Undyed Natural" />
-            </div>
-            <button className="btn btn-primary" id="thirdCustomize" style={{ fontFamily: "'Manrope',sans-serif" }}>Customize a tee</button>
-          </div>
-        </div>
-      </section>
-
-      <section style={{ background: 'var(--paper-surface)', color: 'var(--ink)', padding: '24px 0 64px', borderTop: '1.5px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="section-head">
-            <div>
-              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
-                GARMENT SCRUTINY
-              </div>
-              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>Built for scrutiny</h2>
-            </div>
-            <p style={{ color: 'var(--ink-soft)' }}>The white tee, up close &mdash; weave, stitching, and embroidery detail.</p>
-          </div>
-          <div className="scrutiny-grid">
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
-              <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_f9db9841-0a2f-47d8-a71f-6054f288935c.png" alt="Macro detail of embroidered logo on white cotton t-shirt" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
-              <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_aeb7a148-4bf4-4cba-a335-123d93a5d9db.png" alt="Folded white t-shirt showing fabric weave and seam stitching" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
-              <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_6506c085-41fe-4e67-b573-93c71e87b9a8.png" alt="Close-up of white t-shirt collar with embroidered emblem" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="section" id="shop" style={{ background: 'var(--paper)', color: 'var(--ink)', borderTop: '1.5px solid var(--line)' }}>
-        <div className="wrap">
-          <div className="section-head">
-            <div>
-              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
-                PREMIUM BLANKS
-              </div>
-              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>Pick a blank to start on</h2>
-            </div>
-            <p style={{ color: 'var(--ink-soft)' }}>Every color opens the same proof frame &mdash; your design carries over.</p>
-          </div>
-          <div className="grid">
-            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
-              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#F6F4EE', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.18))' }} />
-                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
-                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
-                  100% cotton
-                </div>
-              </div>
-              <div className="body" style={{ borderColor: 'var(--line)' }}>
-                <div className="name" style={{ color: 'var(--ink)' }}>Canvas White</div>
-                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $14.00</div>
-                <button className="btn small openFrame" data-color="#F6F4EE" style={{ width: '100%' }}>Customize</button>
-              </div>
-            </div>
-            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
-              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#1B1C1E', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.25))' }} />
-                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
-                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
-                  100% cotton
-                </div>
-              </div>
-              <div className="body" style={{ borderColor: 'var(--line)' }}>
-                <div className="name" style={{ color: 'var(--ink)' }}>Ink Black</div>
-                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $14.00</div>
-                <button className="btn small openFrame" data-color="#1B1C1E" style={{ width: '100%' }}>Customize</button>
-              </div>
-            </div>
-            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
-              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#CBA97A', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.18))' }} />
-                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
-                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
-                  100% cotton
-                </div>
-              </div>
-              <div className="body" style={{ borderColor: 'var(--line)' }}>
-                <div className="name" style={{ color: 'var(--ink)' }}>Undyed Natural</div>
-                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $15.00</div>
-                <button className="btn small openFrame" data-color="#CBA97A" style={{ width: '100%' }}>Customize</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="wrap" style={{ marginTop: '64px' }}>
-          <div className="section-head">
-            <div>
-              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
-                METHODOLOGY
-              </div>
-              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>How the proof frame works</h2>
-            </div>
-          </div>
-          <div className="steps">
-            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
-              <iconify-icon className="step-icon" icon="mdi:cloud-upload-outline" style={{ color: 'var(--blue)' }} />
-              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>Upload your design in 3D</h3>
-              <p style={{ color: 'var(--ink-soft)' }}>Drop a design file onto any blank. It reads straight into the proof frame.</p>
-            </div>
-            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
-              <iconify-icon className="step-icon" icon="mdi:cube-scan" style={{ color: 'var(--blue)' }} />
-              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>The frame opens on the shirt</h3>
-              <p style={{ color: 'var(--ink-soft)' }}>A live 3D proof opens right on the garment &mdash; not a flat sticker.</p>
-            </div>
-            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
-              <iconify-icon className="step-icon" icon="mdi:check-decagram-outline" style={{ color: 'var(--blue)' }} />
-              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>Approve, then it goes to press</h3>
-              <p style={{ color: 'var(--ink-soft)' }}>Once the proof looks right, the same file is what gets printed.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section style={{ position: 'relative', minHeight: '70vh', display: 'flex', alignItems: 'flex-end', background: "url('https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_081447_70ad87e7-29a2-4c17-94d6-02871420d66f.png') center/cover no-repeat" }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, #242C47 15%, rgba(36,44,71,.75) 60%, rgba(101,146,197,.2) 100%)' }} />
-        <div className="wrap" style={{ position: 'relative', padding: '64px 40px 56px', color: 'var(--paper)' }}>
-          <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 'clamp(28px,4.5vw,52px)', lineHeight: 1.25, letterSpacing: '-.02em', maxWidth: '640px', marginBottom: '22px', color: 'var(--paper)', textShadow: '0 2px 16px rgba(0,0,0,.45)' }}>
-            One proof. No surprises. The shirt you saw is the shirt you get.
-          </h2>
-          <button className="btn" id="storyCustomize" style={{ fontFamily: "'Manrope',sans-serif", background: 'var(--paper)', color: 'var(--ink)', borderColor: 'var(--paper)' }}>Start designing</button>
-        </div>
-      </section>
-
-      <footer style={{ background: 'var(--navy)', color: 'rgba(240,238,230,.75)', borderTop: '1.5px solid rgba(101,146,197,.3)', padding: '40px 0 50px' }}>
-        <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-            <span style={{ fontWeight: 700, color: 'var(--paper)', letterSpacing: '.04em' }}>ORICAN &mdash; a print-on-demand studio</span>
-            <span style={{ fontSize: '11px', color: 'var(--blue)', fontFamily: "'IBM Plex Mono',monospace" }}>3D Vector Proofing Engine Active</span>
-          </div>
-          <div style={{ fontSize: '11px', color: 'rgba(240,238,230,.45)' }}>
-            Curated 60-30-10 palette in Natural Linen (#F0EEE6), Slate Blue (#6592C5), and Midnight Slate (#242C47) &middot; &copy; {new Date().getFullYear()} ORICAN Studio. All rights reserved.
-          </div>
-        </div>
-      </footer>
-
-      {/* ============ THE FRAME (modal) ============ */}
-      <div className="overlay" id="overlay">
-        <div className="frame">
-          <div className="corner tl" /><div className="corner tr" />
-          <div className="corner bl" /><div className="corner br" />
-
-          <div className="viewport">
-            <button className="close-btn" id="closeFrame"><iconify-icon icon="mdi:close" /></button>
-            <div className="corner-actions">
-              <button className="corner-btn" id="uploadBtn" title="Upload your 3D design (.obj)">
-                <iconify-icon icon="mdi:cube-send" />
-                <input type="file" id="fileInput" accept=".obj" />
-              </button>
-              <button className="corner-btn secondary" id="textureBtn" title="Add a texture image to the design">
-                <iconify-icon icon="mdi:image-plus-outline" />
-                <input type="file" id="textureInput" accept="image/*" />
-              </button>
-            </div>
-            <canvas ref={mainCanvasRef} id="mainCanvas" />
-            <div className="hint">Drag the design to turn it &middot; middle-click drag to move it</div>
-            <div className="toast" id="toast">3D design placed on proof</div>
-          </div>
-
-          <div className="controls">
-            <div>
-              <h3 id="productName">Canvas White</h3>
-              <div className="sub">Proof updates live as you customize.</div>
-            </div>
-
-            <div>
-              <div className="field-label">GARMENT COLOR</div>
-              <div className="colors" id="colorPicker">
-                <div className="dot active" style={{ background: '#F6F4EE', border: '1px solid #CFC9BA' }} data-color="#F6F4EE" />
-                <div className="dot" style={{ background: '#1B1C1E' }} data-color="#1B1C1E" />
-                <div className="dot" style={{ background: '#CBA97A' }} data-color="#CBA97A" />
-                <div className="dot" style={{ background: '#00AEEF' }} data-color="#00AEEF" />
-                <div className="dot" style={{ background: '#DD0072' }} data-color="#DD0072" />
-              </div>
-            </div>
-
-            <div>
-              <div className="field-label">DESIGN SIZE</div>
-              <div className="slider-row">
-                <span className="glyph">&minus;</span>
-                <input type="range" id="sizeSlider" min="0" max="100" defaultValue="33" />
-                <span className="glyph">+</span>
-              </div>
-            </div>
-
-            <div>
-              <div className="field-label">POSITION</div>
-              <div className="dpad">
-                <button className="up" data-dx="0" data-dy="1" title="Move up"><iconify-icon icon="mdi:arrow-up" /></button>
-                <button className="left" data-dx="-1" data-dy="0" title="Move left"><iconify-icon icon="mdi:arrow-left" /></button>
-                <button className="center" id="resetPosBtn" title="Center"><iconify-icon icon="mdi:circle-small" /></button>
-                <button className="right" data-dx="1" data-dy="0" title="Move right"><iconify-icon icon="mdi:arrow-right" /></button>
-                <button className="down" data-dx="0" data-dy="-1" title="Move down"><iconify-icon icon="mdi:arrow-down" /></button>
-              </div>
-            </div>
-
-            <div>
-              <div className="field-label">SIZE</div>
-              <div className="sizes" id="sizePicker">
-                <div className="size-pill" data-size="S">S</div>
-                <div className="size-pill active" data-size="M">M</div>
-                <div className="size-pill" data-size="L">L</div>
-                <div className="size-pill" data-size="XL">XL</div>
-              </div>
-            </div>
-
-            <div>
-              <button className="btn" id="nextBtn" style={{ width: '100%' }}>Next</button>
-            </div>
-
-            <div className="price-row">
+        {/* ================= 2. MULTI-GARMENT EXTENSION SHOWCASE ================= */}
+        <section
+          className="scroll-reveal-section glass-section-surface"
+          id="garments"
+          style={{ color: 'var(--ink)', padding: '72px 0 80px' }}
+        >
+          <div className="wrap">
+            <div className="section-head">
               <div>
-                <div className="price">$28.00</div>
-                <div className="sub" style={{ marginTop: '2px' }}>Blank + design proof</div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--blue)',
+                    letterSpacing: '.08em',
+                    fontWeight: 700,
+                    marginBottom: '8px',
+                  }}
+                >
+                  EXTENDED PRINT PROOFING
+                </div>
+                <h2
+                  style={{
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-title)',
+                    fontSize: 'clamp(28px, 4vw, 44px)',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Beyond the basic tee
+                </h2>
               </div>
-              <button className="btn">Add to cart</button>
+              <p style={{ color: 'var(--ink-soft)', maxWidth: '380px' }}>
+                Proof complete apparel collections with calibrated registration boundaries for pants, hoodies, jackets, and tees.
+              </p>
+            </div>
+
+            {/* Category Toggle Tabs: Tops / Bottoms / Outerwear */}
+            <div
+              style={{
+                display: 'inline-flex',
+                gap: '8px',
+                background: 'rgba(101, 146, 197, 0.12)',
+                padding: '4px',
+                borderRadius: '999px',
+                marginBottom: '36px',
+              }}
+            >
+              {(['tops', 'bottoms', 'outerwear'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  style={{
+                    padding: '8px 24px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    textTransform: 'capitalize',
+                    cursor: 'pointer',
+                    background: activeCategory === cat ? 'var(--ink)' : 'transparent',
+                    color: activeCategory === cat ? 'var(--paper)' : 'var(--ink)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Multi-Garment Grid */}
+            <div className="grid">
+              {categoryModels.map((model, idx) => (
+                <div
+                  key={model.id}
+                  className="card stagger-item glass-card"
+                  style={{ '--item-idx': idx } as React.CSSProperties}
+                >
+                  <div className="swatch" style={{ background: 'rgba(232, 228, 218, 0.65)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <Box size={54} color="#6592C5" />
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          color: 'var(--ink-soft)',
+                          fontFamily: 'var(--font-sans)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {model.printZone.name}
+                      </span>
+                    </div>
+                    <div
+                      className="material-badge"
+                      style={{
+                        background: 'rgba(240,238,230,.94)',
+                        borderColor: 'var(--blue)',
+                        color: 'var(--ink)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--blue)',
+                          display: 'inline-block',
+                        }}
+                      />
+                      {model.tier.toUpperCase()}
+                    </div>
+                  </div>
+
+                  <div className="body" style={{ borderColor: 'var(--line)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <div className="name" style={{ color: 'var(--ink)', margin: 0 }}>
+                        {model.name}
+                      </div>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          color: 'var(--blue)',
+                        }}
+                      >
+                        ${model.blankPrice.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="price" style={{ color: 'var(--ink-soft)', marginBottom: '16px' }}>
+                      {model.description}
+                    </div>
+
+                    <Link
+                      href="/studio"
+                      className="btn small"
+                      style={{
+                        width: '100%',
+                        borderRadius: '6px',
+                        background: 'var(--ink)',
+                        color: 'var(--paper)',
+                      }}
+                    >
+                      <span>Open in 3D Studio</span>
+                      <ChevronRight size={14} />
+                    </Link>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        </section>
 
-          <div className="result-view" id="resultView">
-            <button className="close-btn" id="closeResult"><iconify-icon icon="mdi:close" /></button>
-            <div className="result-inner">
-              <div className="result-main">
-                <div className="field-label">FINAL IMAGE</div>
-                <img id="mockupImg" className="mockup-img" alt="Final shirt mockup" />
+        {/* ================= 3. 3D MODELS ECOSYSTEM (BASE / COMMUNITY / PAID) ================= */}
+        <section
+          className="scroll-reveal-section glass-section-surface"
+          id="ecosystem"
+          style={{ color: 'var(--ink)', padding: '72px 0 84px' }}
+        >
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--blue)',
+                    letterSpacing: '.08em',
+                    fontWeight: 700,
+                    marginBottom: '8px',
+                  }}
+                >
+                  3D ASSET LIBRARY
+                </div>
+                <h2
+                  style={{
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-title)',
+                    fontSize: 'clamp(28px, 4vw, 44px)',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Decomposed into 3 tiers
+                </h2>
               </div>
-              <div className="result-side">
-                <h3>Ready to print</h3>
-                <div className="sub">The exact print file, and a flat preview of the finished tee.</div>
-                <div className="field-label" style={{ marginTop: '18px' }}>PRINT FILE</div>
-                <img id="cropImg" className="crop-img" alt="Print area file" />
-                <div className="result-actions">
-                  <button className="btn" id="downloadMockupBtn">Download JPG</button>
-                  <button className="btn ghost" id="downloadCropBtn">Download print file</button>
-                  <button className="btn ghost" id="backToEditorBtn">Back to editor</button>
+              <p style={{ color: 'var(--ink-soft)', maxWidth: '380px' }}>
+                Pick from our standard production blanks, community streetwear meshes, or commercial pro CAD files.
+              </p>
+            </div>
+
+            {/* 3 Tier Cards */}
+            <div className="grid">
+              {/* Base Tier Card */}
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 0,
+                    padding: '28px 24px',
+                    borderRadius: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  } as React.CSSProperties
+                }
+              >
+                <div>
+                  <div
+                    style={{
+                      display: 'inline-block',
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      background: 'rgba(36, 44, 71, 0.08)',
+                      color: 'var(--ink)',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    BASE TIER &middot; FREE &amp; OPEN
+                  </div>
+                  <h3
+                    style={{
+                      fontSize: '22px',
+                      fontFamily: 'var(--font-title)',
+                      color: 'var(--ink)',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    Production Blanks
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: '20px' }}>
+                    Calibrated blanks included free with every print run. Heavyweight tees, classic French Terry hoodies, and relaxed fleece sweatpants.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '28px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Calibrated hardware print zone</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Single-click color matching</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Standard high-res mockups</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginBottom: '12px' }}>
+                    Starting at <strong>$14.00 blank</strong> &middot; Free 3D asset
+                  </div>
+                  <Link
+                    href="/studio"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', borderRadius: '8px' }}
+                  >
+                    <span>Browse Base Models</span>
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Community Tier Card */}
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 1,
+                    padding: '28px 24px',
+                    borderRadius: '14px',
+                    border: '1.5px solid var(--blue)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  } as React.CSSProperties
+                }
+              >
+                <div>
+                  <div
+                    style={{
+                      display: 'inline-block',
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      background: 'rgba(101, 146, 197, 0.18)',
+                      color: 'var(--blue)',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    COMMUNITY &middot; STREETWEAR CUTS
+                  </div>
+                  <h3
+                    style={{
+                      fontSize: '22px',
+                      fontFamily: 'var(--font-title)',
+                      color: 'var(--ink)',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    Creator Silhouettes
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: '20px' }}>
+                    Custom street-ready silhouettes contributed by 3D apparel modelers. Boxy dropped shoulders, vintage crewnecks, and heavyweight skate shorts.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '28px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Artisan drop-shoulder drape</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Custom seam registration</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Open community mesh files</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginBottom: '12px' }}>
+                    Starting at <strong>$16.00 blank</strong> &middot; Open access
+                  </div>
+                  <Link
+                    href="/studio"
+                    className="btn btn-primary"
+                    style={{ width: '100%', borderRadius: '8px' }}
+                  >
+                    <span>Browse Community Models</span>
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Paid / Pro Tier Card */}
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 2,
+                    padding: '28px 24px',
+                    borderRadius: '14px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                  } as React.CSSProperties
+                }
+              >
+                <div>
+                  <div
+                    style={{
+                      display: 'inline-block',
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      background: 'rgba(221, 0, 114, 0.12)',
+                      color: '#DD0072',
+                      fontSize: '10.5px',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      marginBottom: '14px',
+                    }}
+                  >
+                    PAID / PRO &middot; COMMERCIAL CAD
+                  </div>
+                  <h3
+                    style={{
+                      fontSize: '22px',
+                      fontFamily: 'var(--font-title)',
+                      color: 'var(--ink)',
+                      marginBottom: '8px',
+                    }}
+                  >
+                    Master Studio Meshes
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: '20px' }}>
+                    Industrial high-poly garment meshes with multi-panel seam maps, displacement textures, and industrial press RIP integration profiles.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '28px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Utility Cargo Pants &amp; Outerwear</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Displacement &amp; normal weave maps</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ink)' }}>
+                      <Check size={14} color="#6592C5" />
+                      <span>Full commercial license included</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginBottom: '12px' }}>
+                    From <strong>$24.00 blank</strong> &middot; $10-15 asset license
+                  </div>
+                  <Link
+                    href="/studio"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', borderRadius: '8px' }}
+                  >
+                    <span>Browse Pro Models</span>
+                    <ArrowRight size={14} />
+                  </Link>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* ================= 4. GARMENT SCRUTINY SECTION ================= */}
+        <section
+          className="scroll-reveal-section glass-section-surface"
+          id="scrutinySection"
+          style={{ color: 'var(--ink)', padding: '48px 0 68px' }}
+        >
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--blue)',
+                    letterSpacing: '.08em',
+                    fontWeight: 700,
+                    marginBottom: '6px',
+                  }}
+                >
+                  GARMENT SCRUTINY
+                </div>
+                <h2
+                  style={{
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-title)',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  Built for scrutiny
+                </h2>
+              </div>
+              <p style={{ color: 'var(--ink-soft)' }}>
+                Inspect real fabric drape &mdash; weave, stitching, collar, and print ink bonding.
+              </p>
+            </div>
+            <div className="scrutiny-grid">
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 0,
+                    aspectRatio: '16/9',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_f9db9841-0a2f-47d8-a71f-6054f288935c.png"
+                  alt="Macro detail of embroidered logo on cotton garment"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 1,
+                    aspectRatio: '16/9',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_aeb7a148-4bf4-4cba-a335-123d93a5d9db.png"
+                  alt="Folded apparel showing fabric weave and seam stitching"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+              <div
+                className="stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 2,
+                    aspectRatio: '16/9',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  } as React.CSSProperties
+                }
+              >
+                <img
+                  src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_6506c085-41fe-4e67-b573-93c71e87b9a8.png"
+                  alt="Close-up of ribbed collar with embroidered emblem"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 5. METHODOLOGY WORKFLOW ================= */}
+        <section
+          className="scroll-reveal-section glass-section-surface"
+          id="workflowSection"
+          style={{ color: 'var(--ink)', padding: '56px 0 72px' }}
+        >
+          <div className="wrap">
+            <div className="section-head">
+              <div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontFamily: 'var(--font-sans)',
+                    color: 'var(--blue)',
+                    letterSpacing: '.08em',
+                    fontWeight: 700,
+                    marginBottom: '6px',
+                  }}
+                >
+                  METHODOLOGY
+                </div>
+                <h2
+                  style={{
+                    color: 'var(--ink)',
+                    fontFamily: 'var(--font-title)',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
+                  }}
+                >
+                  From 3D digital proof to physical press
+                </h2>
+              </div>
+              <p style={{ color: 'var(--ink-soft)' }}>
+                Four precision steps that eliminate printing errors before production.
+              </p>
+            </div>
+            <div className="steps">
+              <div
+                className="step stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 0,
+                    borderLeft: '2.5px solid var(--blue)',
+                    padding: '24px 20px',
+                    borderRadius: '10px',
+                  } as React.CSSProperties
+                }
+              >
+                <Box className="step-icon" size={24} color="#6592C5" />
+                <h3 style={{ color: 'var(--ink)', fontFamily: 'var(--font-title)', fontWeight: 400 }}>
+                  1. Pick Garment &amp; Model Tier
+                </h3>
+                <p style={{ color: 'var(--ink-soft)' }}>
+                  Select from Base blanks, Community cuts, or Pro CAD models across Tops, Bottoms, and Outerwear.
+                </p>
+              </div>
+
+              <div
+                className="step stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 1,
+                    borderLeft: '2.5px solid var(--blue)',
+                    padding: '24px 20px',
+                    borderRadius: '10px',
+                  } as React.CSSProperties
+                }
+              >
+                <Layers className="step-icon" size={24} color="#6592C5" />
+                <h3 style={{ color: 'var(--ink)', fontFamily: 'var(--font-title)', fontWeight: 400 }}>
+                  2. Upload 3D Mesh or Vector Art
+                </h3>
+                <p style={{ color: 'var(--ink-soft)' }}>
+                  Place Wavefront .OBJ files or raster graphics with automatic planar UV unwrapping directly onto the 3D surface.
+                </p>
+              </div>
+
+              <div
+                className="step stagger-item glass-card"
+                style={
+                  {
+                    '--item-idx': 2,
+                    borderLeft: '2.5px solid var(--blue)',
+                    padding: '24px 20px',
+                    borderRadius: '10px',
+                  } as React.CSSProperties
+                }
+              >
+                <Scissors className="step-icon" size={24} color="#6592C5" />
+                <h3 style={{ color: 'var(--ink)', fontFamily: 'var(--font-title)', fontWeight: 400 }}>
+                  3. Calibrate Registration &amp; Bounds
+                </h3>
+                <p style={{ color: 'var(--ink-soft)' }}>
+                  Use precision D-pad translation and scaling. GPU clipping planes lock your design within physical press platens.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 6. EDITORIAL STORY BANNER WITH "TRY IT" CTA ================= */}
+        <section
+          className="scroll-reveal-section"
+          id="storyBannerSection"
+          style={{
+            position: 'relative',
+            minHeight: '75vh',
+            display: 'flex',
+            alignItems: 'flex-end',
+            background:
+              "url('https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_081447_70ad87e7-29a2-4c17-94d6-02871420d66f.png') center/cover no-repeat",
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(0deg, #242C47 20%, rgba(36,44,71,.82) 65%, rgba(101,146,197,.2) 100%)',
+            }}
+          />
+          <div className="wrap" style={{ position: 'relative', padding: '72px 32px 64px', color: 'var(--paper)' }}>
+            <div
+              style={{
+                fontSize: '11.5px',
+                color: 'var(--blue-bright)',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                marginBottom: '12px',
+              }}
+            >
+              READY TO PROOF YOUR APPAREL?
+            </div>
+            <h2
+              style={{
+                fontFamily: 'var(--font-title)',
+                fontWeight: 400,
+                letterSpacing: '0.01em',
+                fontSize: 'clamp(32px, 5.2vw, 62px)',
+                lineHeight: 1.15,
+                maxWidth: '720px',
+                marginBottom: '20px',
+                color: 'var(--paper)',
+                textShadow: '0 2px 18px rgba(0,0,0,.5)',
+              }}
+            >
+              One proof. No surprises. What you design is what gets printed.
+            </h2>
+            <p
+              style={{
+                fontSize: '15px',
+                lineHeight: 1.6,
+                maxWidth: '560px',
+                color: 'rgba(240, 238, 230, 0.85)',
+                marginBottom: '32px',
+              }}
+            >
+              Over 12,000 garment runs proofed without a single misprint. No credit card, registration, or software download required.
+            </p>
+
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <Link
+                href="/studio"
+                className="btn btn-primary"
+                style={{
+                  background: 'var(--paper)',
+                  color: 'var(--ink)',
+                  borderColor: 'var(--paper)',
+                  borderRadius: '999px',
+                  padding: '14px 34px',
+                  fontSize: '15px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                }}
+              >
+                <Sparkles size={16} color="#6592C5" />
+                <span>Launch 3D Studio &mdash; Try It Now</span>
+                <ArrowRight size={16} />
+              </Link>
+
+              <a
+                href="#garments"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (lenis) {
+                    lenis.scrollTo('#garments', { duration: 1.2 });
+                  } else {
+                    document.getElementById('garments')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                className="btn ghost"
+                style={{
+                  color: 'var(--paper)',
+                  borderColor: 'rgba(240, 238, 230, 0.4)',
+                  borderRadius: '999px',
+                  padding: '14px 26px',
+                  fontSize: '14px',
+                }}
+              >
+                <span>View All Silhouettes</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 7. STUDIO FOOTER ================= */}
+        <footer
+          className="scroll-reveal-section"
+          style={{
+            background: 'rgba(36, 44, 71, 0.96)',
+            backdropFilter: 'blur(16px)',
+            color: 'rgba(240,238,230,.75)',
+            borderTop: '1.5px solid rgba(101,146,197,.3)',
+            padding: '44px 0 54px',
+          }}
+        >
+          <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                width: '100%',
+                flexWrap: 'wrap',
+                gap: '12px',
+                alignItems: 'center',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span
+                  style={{
+                    fontWeight: 400,
+                    fontFamily: 'var(--font-title)',
+                    fontSize: '20px',
+                    color: 'var(--paper)',
+                    letterSpacing: '.04em',
+                  }}
+                >
+                  ORICAN
+                </span>
+                <span style={{ fontSize: '12px', color: 'rgba(240,238,230,0.5)' }}>
+                  Industrial 3D Garment Proofing Studio
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <Link
+                  href="/studio"
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--blue)',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  3D Studio Workstation &rarr;
+                </Link>
+                <span style={{ fontSize: '11px', color: 'var(--blue)', fontFamily: 'var(--font-sans)' }}>
+                  Direct WebGL Engine Active
+                </span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '11.5px', color: 'rgba(240,238,230,.45)', lineHeight: 1.6 }}>
+              Curated 60-30-10 palette in Natural Linen (#F0EEE6), Slate Blue (#6592C5), and Midnight Slate (#242C47) &middot; Strict 2-font system (Boldonse &amp; Inter) &middot; &copy; {new Date().getFullYear()} ORICAN Studio. All rights reserved.
+            </div>
+          </div>
+        </footer>
       </div>
     </>
   );

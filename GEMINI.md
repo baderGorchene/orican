@@ -26,10 +26,11 @@
 | **Framework** | Next.js 15.1.7 | App Router architecture, Server & Client Components |
 | **UI Library** | React 19.0.0 | React DOM 19, modern hooks (`useRef`, `useState`, `useEffect`) |
 | **Language** | TypeScript 5.7.3 | Strict typing, ES2020 target, path alias `@/*` -> `./*` |
+| **Smooth Scroll** | Lenis 1.3.26 | Studio Freight/Darkroom smooth scroll (`lenis/react`), native CSS normalization |
 | **3D Graphics** | Three.js 0.173.0 | Pure WebGL renderer, custom render loops, zero heavy wrapper overhead |
 | **Styling** | Vanilla CSS | Custom CSS variable design system (`globals.css`), scoped `<style jsx>` |
 | **Icons** | Lucide React & Iconify | `lucide-react` (0.475.0), `@iconify/react` (6.0.2), Iconify CDN script |
-| **Typography** | Google Fonts | Inter, IBM Plex Mono, Manrope, Poppins |
+| **Typography** | Google Fonts | Boldonse (Titles), Inter (Body & UI) — Strict 2-font system |
 | **Host OS** | Windows (PowerShell/CMD) | Note execution policy gotcha below |
 
 ---
@@ -70,7 +71,9 @@ orican-next/
 ├── app/
 │   ├── globals.css          # Comprehensive design system, CSS variables, utility classes, and keyframes
 │   ├── layout.tsx           # Root HTML layout with Google Font preconnects, viewport, & Iconify script
-│   └── page.tsx             # Interactive landing page with scrub video, 3D viewer, and studio modal
+│   ├── page.tsx             # Narrative landing page with 270-frame scrub parallax, multi-garment & tier showcases
+│   └── studio/              # Dedicated 3D Customization Studio
+│       └── page.tsx         # Full-screen 3D CAD/DAW workstation with Base/Community/Paid model browser
 ├── components/              # Modular UI components
 │   ├── CatalogSection.tsx   # Garment blank cards with color swatches & price breakdowns
 │   ├── Footer.tsx           # Studio footer with legal, typography credits, & branding
@@ -87,15 +90,15 @@ orican-next/
 │       ├── ResultView.tsx   # Final proof display, certificate badge, and JPG/PNG downloads
 │       └── ThreeViewer.tsx  # Canvas viewport wrapper with .OBJ & image texture upload handlers
 ├── lib/                     # Core business logic & 3D rendering engines
-│   ├── constants.ts         # Garment dimensions, SVG path data, color swatches, sizes, pricing
+│   ├── constants.ts         # Garment dimensions, SVG path data (Shirt, Hoodie, Pants, Jacket), 3D catalog
 │   ├── obj-parser.ts        # Pure TypeScript Wavefront .OBJ parser with planar UV auto-generation
-│   ├── three-shirt-engine.ts# Three.js shirt engine, canvas texture generation, & WebGL clipping
-│   └── types.ts             # Shared interfaces (GarmentColor, GarmentSize, ShirtViewerInstance, etc.)
+│   ├── three-shirt-engine.ts# Multi-garment Three.js engine with dynamic silhouette swapping & WebGL clipping
+│   └── types.ts             # Shared interfaces (GarmentCategory, ModelTier, GarmentModel, ShirtViewerInstance)
 ├── public/
 │   ├── samples/
 │   │   └── sample-diamond.obj # Default 3D crest mesh for immediate user testing
 │   └── video/
-│       └── hero-scrub.mp4     # 5-second 60fps high-res video scrubbing through garment production
+│       └── frame_001.jpg ... frame_270.jpg # 270-frame high-res 60fps image sequence for canvas scrub
 ├── types/
 │   └── global.d.ts          # Global JSX type declarations (e.g. for custom <iconify-icon>)
 ├── next.config.js           # Next.js build configuration & image domain patterns
@@ -107,54 +110,61 @@ orican-next/
 
 ## 5. Key Technical Systems Deep-Dive
 
-### 5.1 Three.js 2D-to-3D Garment Engine (`lib/three-shirt-engine.ts`)
-Rather than relying on a static, rigid 3D polygon model for the shirt, ORICAN uses a hybrid vector-to-texture mapping approach:
-1. **Vector Outline (`SHIRT_PATH_D`)**: An organic t-shirt silhouette SVG path (`M 121.8,23.38...`) is dynamically drawn onto an offscreen 1024x1280 HTML canvas with the user's chosen garment color and a crisp stroke outline.
-2. **Canvas Texture**: The canvas is mapped to a `THREE.CanvasTexture` applied to a `THREE.PlaneGeometry(3.1, 3.875)`.
-3. **Lighting & Shadows**: Ambient light (0.85), key directional light (0.95), fill directional light (0.4), and a procedural ground radial gradient shadow plane create realistic studio lighting.
-4. **Hardware WebGL Clipping**: The printable chest zone (`PRINT_SIZE`: 30% width, 26% height) is locked using 4 hardware clipping planes (`THREE.Plane`). Any 3D geometry placed by the user outside this boundary is hardware-clipped by the GPU.
-5. **DOM Viewport Mask**: Screen coordinates of the printable boundary are continuously calculated via `camera.project()`, driving 4 overlay mask bands (`.print-mask-band`) with a subtle tinted backdrop filter.
+### 5.1 Multi-Garment 2D-to-3D Garment Engine (`lib/three-shirt-engine.ts`)
+Rather than relying on a static, rigid 3D polygon model, ORICAN uses a hybrid parametric vector-to-texture mapping approach:
+1. **Dynamic Vector Silhouettes**: Silhouettes for T-Shirts (`SHIRT_PATH_D`), Hoodies (`HOODIE_PATH_D`), Pants (`PANTS_PATH_D`), and Jackets (`JACKET_PATH_D`) are dynamically drawn onto an offscreen canvas in user-selected garment colors with high-contrast outlines.
+2. **On-the-Fly Garment Swapping (`setGarmentModel`)**: Switching models updates the canvas dimensions, adjusts the Three.js plane geometry aspect ratio, moves the design anchor, and recalculates GPU hardware clipping planes seamlessly without recreating the WebGL context.
+3. **Hardware WebGL Clipping**: Garment-specific printable boundaries (e.g. chest print zone, thigh zone, placket offset) are locked using 4 hardware clipping planes (`THREE.Plane`). Any geometry placed outside this boundary is hardware-clipped by the GPU.
+4. **DOM Viewport Mask**: Screen coordinates of the printable boundary are continuously calculated via `camera.project()`, driving 4 overlay mask bands (`.print-mask-band`) with a subtle tinted backdrop filter.
 
-### 5.2 Wavefront OBJ Parser & UV Generator (`lib/obj-parser.ts`)
+### 5.2 3D Model Asset Ecosystem & Tiers (`lib/constants.ts`, `lib/types.ts`)
+Garment blanks are organized across three distinct tiers and categories:
+- **Base Tier**: Production essentials included free with every print order (Heavyweight Tee, French Terry Hoodie, Relaxed Fleece Sweatpants).
+- **Community Tier**: Streetwear cuts created by 3D designers (Boxy Dropped-Shoulder Tee, Vintage Pigment Crewneck, Skate Heavy Shorts).
+- **Paid / Pro Tier**: Commercial CAD master meshes with multi-panel seam maps and press RIP integration profiles (Utility Cargo Pants, Technical Windbreaker, Canvas Coach Jacket).
+- **Categories**: Tops, Bottoms, Outerwear.
+
+### 5.3 Wavefront OBJ Parser & UV Generator (`lib/obj-parser.ts`)
 A zero-dependency parser tailored for rapid user file processing:
 - Parses vertex positions (`v`), texture coordinates (`vt`), and face indexes (`f`).
 - Triangulates arbitrary n-gons into triangle fans.
-- **Automatic Planar UV Generation**: Many user-uploaded 3D models lack UV maps. When missing, `parseOBJ` calculates the bounding box span and projects planar coordinates $(x - \min_x) / \text{span}_x$, allowing bitmap textures to seamlessly wrap onto imported 3D shapes.
+- **Automatic Planar UV Generation**: When UV maps are absent, `parseOBJ` calculates the bounding box span and projects planar coordinates $(x - \min_x) / \text{span}_x$, allowing bitmap textures to seamlessly wrap onto imported 3D shapes.
 - Automatically centers geometry and calculates vertex normals and bounding spheres.
 
-### 5.3 Hero Scroll Scrubbing System (`app/page.tsx`)
-The hero features a sticky video scrub experience:
-- Container with extended scroll height binds window scroll offset to `video.currentTime`.
+### 5.4 Hero Scroll Scrubbing System (`app/page.tsx`)
+The landing page hero features a sticky 270-frame canvas image scrub experience:
+- Container with extended scroll height binds window scroll offset to frame sequence index $(1 \dots 270)$.
+- High-performance HTML5 `<canvas>` renders each frame with progressive preloading and nearest-neighbor fallbacks for zero flicker.
+- Angle-matched scroll parallax continues smoothly across sections as the user scrolls down the page.
 - Synchronized multi-phase headline transitions driven by scroll progress:
   - **Phase 0 (0% – 32%)**: *"Customize like a Pro"*
   - **Phase 1 (32% – 66%)**: *"Rotate & Inspect in 360°"*
-  - **Phase 2 (66% – 100%)**: *"Sub-Millimeter Print Registration"*
+  - **Phase 2 (66% – 100%)**: *"Beyond T-Shirts: Pants, Hoodies & Jackets"*
 - Interactive step-dot indicators allowing users to jump directly to specific phases.
 
-### 5.4 Proof & Mockup Export Pipeline
+### 5.5 Proof & Mockup Export Pipeline
 The studio generates two distinct export artifacts without server-side processing:
 1. **Flat 2D Composite Mockup (`exportMockupJPG`)**:
-   - Composite canvas matching native shirt texture resolution.
-   - Renders white studio backdrop + garment silhouette + design rendered within the chest print area.
-   - Output: High-res JPEG (`image/jpeg`, 0.95 quality).
+   - Composite canvas matching native garment texture resolution.
+   - Renders studio backdrop + garment silhouette + design rendered within the garment print area.
+   - Output: High-res JPEG (`image/jpeg`, 0.92 quality).
 2. **Isolated Print-Area File (`exportPrintFileCrop`)**:
    - Crops WebGL canvas using the calculated screen projection coordinates multiplied by device pixel ratio.
    - Output: Lossless PNG (`image/png`) matching the exact bounded print file for press RIP software.
 
 ---
 
-## 6. Architecture Status & Refactoring Roadmap
+## 6. Architecture Status & Clean Separation
 
-### Current Architectural State
-The codebase contains two parallel representations of the landing and studio experience:
-1. **`app/page.tsx`**: A self-contained, monolithic implementation containing the scroll scrub video hero, stats, scrutiny gallery, catalog, workflow, and inline Three.js modal.
-2. **`components/` & `lib/`**: A fully modularized, clean React component architecture (`Header`, `HeroSection`, `StatsBar`, `LiveStudioSection`, `ScrutinyGallery`, `CatalogSection`, `WorkflowSteps`, `StoryBanner`, `Footer`, `studio/ProofModal`, etc.).
-
-### When Modifying the Codebase
-- If refactoring `app/page.tsx` to use the modular components, ensure that:
-  - The sticky hero scrub video and stage transitions in `app/page.tsx` are either preserved or cleanly abstracted into a dedicated component.
-  - The `ProofModal` component in `components/studio/ProofModal.tsx` receives the active garment color and triggers smoothly from catalog and CTA buttons.
-  - No Three.js state is duplicated across unmounted components.
+### Complete Separation of Concerns
+1. **`app/page.tsx` (Landing / Storytelling)**:
+   - Centered entirely around the visual introduction, 270-frame canvas scroll scrub parallax, multi-phase prompts, multi-garment showcase, and 3D model tier ecosystem teaser.
+   - All interactive CTAs (`[ Enter 3D Studio &mdash; Try It Free ]`, `[ Launch 3D Studio ]`, `[ Open in 3D Studio ]`) link directly to `/studio`.
+2. **`app/studio/page.tsx` (3D Studio Workstation)**:
+   - Dedicated full-screen CAD/DAW experience.
+   - Left panel: 3D Model asset library with Base / Community / Paid tabs, category filters (Tops / Bottoms / Outerwear), and search.
+   - Center panel: Interactive WebGL 3D canvas with OrbitControls, sample model preloading, .OBJ file drop, and image texture uploads.
+   - Right panel: Precision print controls (dye colors, artwork scaling slider, sub-mm D-pad offset, size pills, DTG vs Screen Print techniques, live press cost calculation, and high-res JPEG mockup & PNG print file export).
 
 ---
 

@@ -48,10 +48,10 @@ export const WorkflowSteps: React.FC = () => {
           </div>
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(28px, 3.2vw, 40px)',
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
+              fontFamily: 'var(--font-title)',
+              fontSize: 'clamp(32px, 3.6vw, 46px)',
+              fontWeight: 400,
+              letterSpacing: '0.01em',
               color: 'var(--ink)',
             }}
           >
@@ -91,9 +91,10 @@ export const WorkflowSteps: React.FC = () => {
               </div>
               <h3
                 style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: '18px',
-                  fontWeight: 700,
+                  fontFamily: 'var(--font-title)',
+                  fontSize: '20px',
+                  fontWeight: 400,
+                  letterSpacing: '0.01em',
                   color: 'var(--ink)',
                   marginBottom: '10px',
                 }}

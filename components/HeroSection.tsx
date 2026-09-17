@@ -81,11 +81,11 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
       {/* Main Headline */}
       <h1
         style={{
-          fontFamily: "'Poppins', sans-serif",
-          fontSize: 'clamp(42px, 6.8vw, 84px)',
-          fontWeight: 700,
-          lineHeight: 1.18,
-          letterSpacing: '-0.025em',
+          fontFamily: 'var(--font-title)',
+          fontSize: 'clamp(44px, 7vw, 88px)',
+          fontWeight: 400,
+          lineHeight: 1.15,
+          letterSpacing: '0.01em',
           maxWidth: '900px',
           margin: '0 auto 20px',
           color: '#242C47',

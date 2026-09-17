@@ -31,11 +31,11 @@ export const Footer: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span
               style={{
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 800,
+                fontFamily: 'var(--font-title)',
+                fontWeight: 400,
                 color: 'var(--paper)',
-                letterSpacing: '0.06em',
-                fontSize: '16px',
+                letterSpacing: '0.04em',
+                fontSize: '18px',
               }}
             >
               ORICAN

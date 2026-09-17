@@ -58,10 +58,10 @@ export const ScrutinyGallery: React.FC = () => {
             </div>
             <h2
               style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 'clamp(28px, 3.2vw, 38px)',
-                fontWeight: 700,
-                letterSpacing: '-0.02em',
+                fontFamily: 'var(--font-title)',
+                fontSize: 'clamp(32px, 3.6vw, 44px)',
+                fontWeight: 400,
+                letterSpacing: '0.01em',
                 color: 'var(--ink)',
               }}
             >
@@ -122,9 +122,10 @@ export const ScrutinyGallery: React.FC = () => {
               <div style={{ padding: '20px' }}>
                 <h3
                   style={{
-                    fontFamily: 'var(--font-sans)',
-                    fontSize: '16px',
-                    fontWeight: 700,
+                    fontFamily: 'var(--font-title)',
+                    fontSize: '18px',
+                    fontWeight: 400,
+                    letterSpacing: '0.01em',
                     marginBottom: '6px',
                     color: 'var(--ink)',
                   }}

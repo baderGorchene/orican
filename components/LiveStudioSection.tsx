@@ -127,9 +127,10 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
 
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 'clamp(32px, 3.6vw, 46px)',
-              fontWeight: 700,
+              fontFamily: 'var(--font-title)',
+              fontSize: 'clamp(34px, 4vw, 50px)',
+              fontWeight: 400,
+              letterSpacing: '0.01em',
               lineHeight: 1.15,
               color: 'var(--ink)',
               marginBottom: '16px',

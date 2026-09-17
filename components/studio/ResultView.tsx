@@ -113,9 +113,10 @@ export const ResultView: React.FC<ResultViewProps> = ({
 
           <h3
             style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: '24px',
-              fontWeight: 700,
+              fontFamily: 'var(--font-title)',
+              fontSize: '26px',
+              fontWeight: 400,
+              letterSpacing: '0.01em',
               marginBottom: '8px',
               color: 'var(--ink)',
             }}

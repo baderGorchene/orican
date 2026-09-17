@@ -48,10 +48,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span
             style={{
-              fontFamily: 'var(--font-sans)',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              fontSize: '18px',
+              fontFamily: 'var(--font-title)',
+              fontWeight: 400,
+              letterSpacing: '0.04em',
+              fontSize: '20px',
               lineHeight: 1,
               color: 'var(--ink)',
             }}
