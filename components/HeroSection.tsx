@@ -21,7 +21,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
         padding: '80px 24px 100px',
         overflow: 'hidden',
         background:
-          'radial-gradient(120% 90% at 50% 8%, rgba(60, 90, 140, 0.18), transparent 60%), radial-gradient(90% 70% at 82% 90%, rgba(217, 99, 30, 0.14), transparent 55%), #050608',
+          'radial-gradient(120% 90% at 50% 8%, rgba(101, 146, 197, 0.22), transparent 60%), radial-gradient(90% 70% at 82% 90%, rgba(36, 44, 71, 0.08), transparent 55%), #F0EEE6',
       }}
     >
       {/* Background Decorative Rings */}
@@ -34,9 +34,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
           width: 'min(780px, 92vw)',
           height: 'min(780px, 92vw)',
           borderRadius: '50%',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: '1.5px solid rgba(101, 146, 197, 0.25)',
           pointerEvents: 'none',
-          boxShadow: '0 0 120px rgba(217, 99, 30, 0.06)',
+          boxShadow: '0 0 120px rgba(101, 146, 197, 0.12)',
         }}
       />
       <div
@@ -49,7 +49,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
           height: 'min(560px, 70vw)',
           borderRadius: '50%',
           background:
-            'repeating-conic-gradient(rgba(255, 255, 255, 0.03) 0deg 0.5deg, transparent 0.5deg 6deg)',
+            'repeating-conic-gradient(rgba(101, 146, 197, 0.12) 0deg 0.5deg, transparent 0.5deg 6deg)',
           mask: 'radial-gradient(circle, transparent 0 62%, #000 63% 66%, transparent 67%)',
           WebkitMask:
             'radial-gradient(circle, transparent 0 62%, #000 63% 66%, transparent 67%)',
@@ -69,11 +69,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
           marginBottom: '28px',
           fontSize: '12px',
           fontFamily: 'var(--font-mono)',
-          color: 'rgba(255, 255, 255, 0.85)',
+          color: 'var(--ink)',
+          fontWeight: 600,
           letterSpacing: '0.04em',
         }}
       >
-        <Box size={14} color="#D9631E" />
+        <Box size={14} color="#6592C5" />
         <span>THREE.JS REAL-TIME PROOFING ENGINE</span>
       </div>
 
@@ -87,18 +88,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
           letterSpacing: '-0.025em',
           maxWidth: '900px',
           margin: '0 auto 20px',
-          color: '#FFFFFF',
-          textShadow: '0 4px 24px rgba(0, 0, 0, 0.6)',
+          color: '#242C47',
         }}
       >
-        Customize <span style={{ color: '#D9631E' }}>like a Pro.</span>
+        Customize <span style={{ color: '#6592C5' }}>like a Pro.</span>
       </h1>
 
       {/* Subtitle */}
       <p
         style={{
           fontSize: 'clamp(16px, 1.35vw, 19px)',
-          color: 'rgba(255, 255, 255, 0.72)',
+          color: '#55627F',
           maxWidth: '620px',
           lineHeight: 1.65,
           margin: '0 auto 36px',
@@ -147,12 +147,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenStudio }) => {
           alignItems: 'center',
           marginTop: '44px',
           fontSize: '12px',
-          color: 'rgba(255, 255, 255, 0.55)',
+          color: '#55627F',
           fontFamily: 'var(--font-mono)',
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <ShieldCheck size={14} color="#D9631E" /> 100% Organic Ringspun Cotton
+          <ShieldCheck size={14} color="#6592C5" /> 100% Organic Ringspun Cotton
         </span>
         <span>&bull;</span>
         <span>Sub-millimeter Print Registration</span>

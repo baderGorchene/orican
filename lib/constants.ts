@@ -25,7 +25,7 @@ export const GARMENT_COLORS: GarmentColor[] = [
     name: 'Canvas White',
     hex: '#F6F4EE',
     price: 14.0,
-    textColor: '#17150F',
+    textColor: '#242C47',
     description: 'Heavyweight organic ringspun jersey in warm natural white.',
   },
   {
@@ -33,7 +33,7 @@ export const GARMENT_COLORS: GarmentColor[] = [
     name: 'Ink Black',
     hex: '#1B1C1E',
     price: 14.0,
-    textColor: '#F6F4EE',
+    textColor: '#F0EEE6',
     description: 'Deep carbon garment-dyed finish with ultra-clean drape.',
   },
   {
@@ -41,7 +41,7 @@ export const GARMENT_COLORS: GarmentColor[] = [
     name: 'Undyed Natural',
     hex: '#CBA97A',
     price: 15.0,
-    textColor: '#17150F',
+    textColor: '#242C47',
     description: 'Pure raw cotton with natural fleck and vintage paper tone.',
   },
   {

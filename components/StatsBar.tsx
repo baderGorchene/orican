@@ -11,10 +11,10 @@ export const StatsBar: React.FC = () => {
   return (
     <section
       style={{
-        background: '#050608',
-        color: '#FFFFFF',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'var(--paper-surface)',
+        color: 'var(--ink)',
+        borderTop: '1.5px solid var(--line)',
+        borderBottom: '1.5px solid var(--line)',
         padding: '38px 0',
       }}
     >
@@ -32,7 +32,7 @@ export const StatsBar: React.FC = () => {
             key={i}
             style={{
               paddingLeft: i === 0 ? '0' : '28px',
-              borderLeft: i === 0 ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+              borderLeft: i === 0 ? 'none' : '1.5px solid var(--line)',
             }}
           >
             <div
@@ -40,7 +40,7 @@ export const StatsBar: React.FC = () => {
                 fontFamily: 'var(--font-display)',
                 fontSize: 'clamp(28px, 3.2vw, 42px)',
                 fontWeight: 700,
-                color: '#FFFFFF',
+                color: 'var(--ink)',
                 lineHeight: 1.1,
               }}
             >
@@ -50,9 +50,10 @@ export const StatsBar: React.FC = () => {
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: 'var(--blue)',
                 letterSpacing: '0.06em',
                 marginTop: '6px',
+                fontWeight: 600,
               }}
             >
               {stat.label}

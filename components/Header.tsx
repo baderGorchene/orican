@@ -16,9 +16,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '24px 40px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(5, 6, 8, 0.75)',
+        padding: '22px 40px',
+        borderBottom: '1.5px solid var(--line)',
+        background: 'rgba(240, 238, 230, 0.9)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
       }}
@@ -30,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          color: '#FFFFFF',
+          color: 'var(--ink)',
           textDecoration: 'none',
         }}
         aria-label="ORICAN Studio Home"
@@ -41,9 +41,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
           xmlns="http://www.w3.org/2000/svg"
           style={{ width: '28px', height: '28px' }}
         >
-          <circle cx="16" cy="16" r="14" stroke="#D9631E" strokeWidth="1.8" />
-          <path d="M16 4v24M4 16h24" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.8" />
-          <circle cx="16" cy="16" r="4" fill="#D9631E" />
+          <circle cx="16" cy="16" r="14" stroke="var(--blue)" strokeWidth="1.8" />
+          <path d="M16 4v24M4 16h24" stroke="var(--ink)" strokeWidth="1.5" strokeOpacity="0.8" />
+          <circle cx="16" cy="16" r="4" fill="var(--blue)" />
         </svg>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span
@@ -53,6 +53,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
               letterSpacing: '0.08em',
               fontSize: '18px',
               lineHeight: 1,
+              color: 'var(--ink)',
             }}
           >
             ORICAN
@@ -61,9 +62,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '9.5px',
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: 'var(--blue)',
               letterSpacing: '0.06em',
               marginTop: '3px',
+              fontWeight: 600,
             }}
           >
             STUDIO PROOFING
@@ -78,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
           alignItems: 'center',
           gap: '32px',
           fontSize: '13px',
-          color: 'rgba(255, 255, 255, 0.65)',
+          color: 'var(--ink-soft)',
         }}
         className="header-meta"
       >
@@ -88,13 +90,13 @@ export const Header: React.FC<HeaderProps> = ({ onOpenStudio }) => {
               width: '8px',
               height: '8px',
               borderRadius: '50%',
-              backgroundColor: '#10B981',
-              boxShadow: '0 0 10px #10B981',
+              backgroundColor: 'var(--blue)',
+              boxShadow: '0 0 10px var(--blue)',
             }}
           />
           Direct Press Engine Active
         </span>
-        <span style={{ color: 'rgba(255, 255, 255, 0.45)' }}>|</span>
+        <span style={{ color: 'var(--line-solid)' }}>|</span>
         <span>What you see is what gets printed</span>
       </div>
 

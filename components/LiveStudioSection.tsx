@@ -38,10 +38,10 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
   return (
     <section
       style={{
-        background: '#0A0B0D',
-        color: '#FFFFFF',
+        background: 'var(--paper)',
+        color: 'var(--ink)',
         padding: '90px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        borderTop: '1.5px solid var(--line)',
         position: 'relative',
       }}
     >
@@ -63,9 +63,9 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
             aspectRatio: '1 / 1',
             margin: '0 auto',
             borderRadius: '16px',
-            background: 'radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(0,0,0,0.6))',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.7)',
+            background: 'var(--white)',
+            border: '1.5px solid var(--blue)',
+            boxShadow: '0 20px 48px -12px rgba(36, 44, 71, 0.16)',
             overflow: 'hidden',
           }}
         >
@@ -81,26 +81,28 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
               position: 'absolute',
               bottom: '16px',
               left: '16px',
-              background: 'rgba(5, 6, 8, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
+              background: 'rgba(240, 238, 230, 0.95)',
+              border: '1px solid var(--blue)',
               backdropFilter: 'blur(8px)',
               padding: '6px 12px',
               borderRadius: '6px',
               fontSize: '11px',
               fontFamily: 'var(--font-mono)',
-              color: 'rgba(255, 255, 255, 0.8)',
+              color: 'var(--ink)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              fontWeight: 600,
             }}
           >
             <span
               style={{
-                width: '6px',
-                height: '6px',
+                width: '8px',
+                height: '8px',
                 borderRadius: '50%',
                 backgroundColor: selectedColor.hex,
                 boxShadow: `0 0 8px ${selectedColor.hex}`,
+                border: selectedColor.hex === '#F6F4EE' ? '1px solid #C0D2E5' : 'none',
               }}
             />
             {selectedColor.name} &middot; Real-time Mesh
@@ -114,7 +116,7 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
               display: 'inline-block',
               fontFamily: 'var(--font-mono)',
               fontSize: '11px',
-              color: 'var(--accent-orange)',
+              color: 'var(--blue)',
               letterSpacing: '0.08em',
               fontWeight: 600,
               marginBottom: '12px',
@@ -129,7 +131,7 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
               fontSize: 'clamp(32px, 3.6vw, 46px)',
               fontWeight: 700,
               lineHeight: 1.15,
-              color: '#FFFFFF',
+              color: 'var(--ink)',
               marginBottom: '16px',
             }}
           >
@@ -140,7 +142,7 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
             style={{
               fontSize: '15px',
               lineHeight: 1.7,
-              color: 'rgba(255, 255, 255, 0.65)',
+              color: 'var(--ink-soft)',
               maxWidth: '460px',
               marginBottom: '32px',
             }}
@@ -156,9 +158,10 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: 'var(--blue)',
                 marginBottom: '14px',
                 letterSpacing: '0.04em',
+                fontWeight: 600,
               }}
             >
               SELECT BLANK COLOR:
@@ -177,11 +180,11 @@ export const LiveStudioSection: React.FC<LiveStudioSectionProps> = ({ onCustomiz
                       borderRadius: '50%',
                       backgroundColor: c.hex,
                       border: isActive
-                        ? '3px solid var(--accent-orange)'
-                        : '2px solid rgba(255, 255, 255, 0.25)',
+                        ? '3px solid var(--blue)'
+                        : '2px solid rgba(101, 146, 197, 0.35)',
                       boxShadow: isActive
-                        ? '0 0 0 3px rgba(5,6,8,0.9), 0 0 16px rgba(217,99,30,0.5)'
-                        : '0 2px 8px rgba(0,0,0,0.3)',
+                        ? '0 0 0 3px rgba(240,238,230,0.9), 0 0 16px rgba(101,146,197,0.5)'
+                        : '0 2px 8px rgba(36,44,71,0.15)',
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       transform: isActive ? 'scale(1.1)' : 'scale(1)',

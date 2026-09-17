@@ -192,7 +192,7 @@ export function createShirtViewer(
       band.style.position = 'absolute';
       band.style.pointerEvents = 'none';
       band.style.zIndex = '2';
-      band.style.backgroundColor = 'rgba(217, 99, 30, 0.12)';
+      band.style.backgroundColor = 'rgba(101, 146, 197, 0.22)';
       band.style.backdropFilter = 'blur(0.5px)';
       maskContainer.appendChild(band);
       maskBands[key] = band;
@@ -240,19 +240,19 @@ export function createShirtViewer(
     maskBands.top.style.cssText = `position:absolute;left:0px;top:0px;width:${w}px;height:${Math.max(
       0,
       top
-    )}px;pointer-events:none;z-index:2;background:rgba(217,99,30,0.12);`;
+    )}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
     maskBands.bottom.style.cssText = `position:absolute;left:0px;top:${bottom}px;width:${w}px;height:${Math.max(
       0,
       h - bottom
-    )}px;pointer-events:none;z-index:2;background:rgba(217,99,30,0.12);`;
+    )}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
     maskBands.left.style.cssText = `position:absolute;left:0px;top:${top}px;width:${Math.max(
       0,
       left
-    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(217,99,30,0.12);`;
+    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
     maskBands.right.style.cssText = `position:absolute;left:${right}px;top:${top}px;width:${Math.max(
       0,
       w - right
-    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(217,99,30,0.12);`;
+    )}px;height:${Math.max(0, bottom - top)}px;pointer-events:none;z-index:2;background:rgba(101,146,197,0.22);`;
   }
 
   function renderPrintAreaCropCanvas(): HTMLCanvasElement {
@@ -426,7 +426,7 @@ export function createShirtViewer(
       redraw();
     },
 
-    setDesignGeometry(geometry: THREE.BufferGeometry, color: string = '#DD0072') {
+    setDesignGeometry(geometry: THREE.BufferGeometry, color: string = '#6592C5') {
       if (designMesh) {
         designAnchor.remove(designMesh);
         designMesh.geometry.dispose();

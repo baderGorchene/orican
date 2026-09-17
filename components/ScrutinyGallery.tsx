@@ -26,9 +26,10 @@ export const ScrutinyGallery: React.FC = () => {
   return (
     <section
       style={{
-        background: '#050608',
-        color: '#FFFFFF',
+        background: 'var(--paper-surface)',
+        color: 'var(--ink)',
         padding: '80px 0',
+        borderTop: '1.5px solid var(--line)',
       }}
     >
       <div className="wrap">
@@ -47,9 +48,10 @@ export const ScrutinyGallery: React.FC = () => {
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
-                color: 'var(--accent-orange)',
+                color: 'var(--blue)',
                 letterSpacing: '0.08em',
                 marginBottom: '8px',
+                fontWeight: 600,
               }}
             >
               GARMENT SCRUTINY
@@ -60,7 +62,7 @@ export const ScrutinyGallery: React.FC = () => {
                 fontSize: 'clamp(28px, 3.2vw, 38px)',
                 fontWeight: 700,
                 letterSpacing: '-0.02em',
-                color: '#FFFFFF',
+                color: 'var(--ink)',
               }}
             >
               Built for scrutiny.
@@ -69,7 +71,7 @@ export const ScrutinyGallery: React.FC = () => {
           <p
             style={{
               fontSize: '14px',
-              color: 'rgba(255, 255, 255, 0.6)',
+              color: 'var(--ink-soft)',
               maxWidth: '340px',
               lineHeight: 1.6,
             }}
@@ -93,10 +95,11 @@ export const ScrutinyGallery: React.FC = () => {
               style={{
                 borderRadius: '12px',
                 overflow: 'hidden',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'var(--white)',
+                border: '1.5px solid var(--line)',
                 display: 'flex',
                 flexDirection: 'column',
+                boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)',
                 transition: 'transform 0.2s ease, border-color 0.2s ease',
               }}
             >
@@ -121,9 +124,9 @@ export const ScrutinyGallery: React.FC = () => {
                   style={{
                     fontFamily: 'var(--font-sans)',
                     fontSize: '16px',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     marginBottom: '6px',
-                    color: '#FFFFFF',
+                    color: 'var(--ink)',
                   }}
                 >
                   {img.title}
@@ -131,7 +134,7 @@ export const ScrutinyGallery: React.FC = () => {
                 <p
                   style={{
                     fontSize: '12.5px',
-                    color: 'rgba(255, 255, 255, 0.6)',
+                    color: 'var(--ink-soft)',
                     lineHeight: 1.5,
                   }}
                 >

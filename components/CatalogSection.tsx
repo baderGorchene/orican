@@ -14,10 +14,10 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
     <section
       id="shop"
       style={{
-        background: '#050608',
-        color: '#FFFFFF',
+        background: 'var(--paper)',
+        color: 'var(--ink)',
         padding: '90px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        borderTop: '1.5px solid var(--line)',
       }}
     >
       <div className="wrap">
@@ -36,9 +36,10 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
               style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: '11px',
-                color: 'var(--accent-orange)',
+                color: 'var(--blue)',
                 letterSpacing: '0.08em',
                 marginBottom: '8px',
+                fontWeight: 600,
               }}
             >
               PREMIUM GARMENT SELECTION
@@ -49,7 +50,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                 fontSize: 'clamp(28px, 3.2vw, 40px)',
                 fontWeight: 700,
                 letterSpacing: '-0.02em',
-                color: '#FFFFFF',
+                color: 'var(--ink)',
               }}
             >
               Pick a blank to start on.
@@ -58,7 +59,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
           <p
             style={{
               fontSize: '14px',
-              color: 'rgba(255, 255, 255, 0.6)',
+              color: 'var(--ink-soft)',
               maxWidth: '340px',
               lineHeight: 1.6,
             }}
@@ -81,12 +82,13 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
             <div
               key={blank.id}
               style={{
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'var(--white)',
+                border: '1.5px solid var(--line)',
                 borderRadius: '8px',
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                boxShadow: '0 12px 30px -12px rgba(36, 44, 71, 0.12)',
                 transition: 'all 0.2s ease',
               }}
             >
@@ -98,8 +100,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                   alignItems: 'center',
                   justifyContent: 'center',
                   position: 'relative',
-                  background:
-                    'radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(0,0,0,0.4))',
+                  background: 'var(--paper-surface)',
                 }}
               >
                 <div
@@ -110,16 +111,17 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: 'rgba(5, 6, 8, 0.82)',
-                    border: '1px solid rgba(255, 255, 255, 0.18)',
+                    background: 'rgba(240, 238, 230, 0.92)',
+                    border: '1px solid var(--blue)',
                     borderRadius: '20px',
                     padding: '5px 12px',
                     fontSize: '11px',
                     fontFamily: 'var(--font-mono)',
-                    color: '#FFFFFF',
+                    color: 'var(--ink)',
+                    fontWeight: 600,
                   }}
                 >
-                  <Check size={12} color="#D9631E" />
+                  <Check size={12} color="#6592C5" />
                   100% Cotton &middot; 240 GSM
                 </div>
 
@@ -130,8 +132,8 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                   style={{
                     filter:
                       blank.id === 'ink-black'
-                        ? 'drop-shadow(0 0 1px rgba(255,255,255,0.4))'
-                        : 'drop-shadow(0 10px 20px rgba(0,0,0,0.4))',
+                        ? 'drop-shadow(0 4px 12px rgba(36,44,71,0.25))'
+                        : 'drop-shadow(0 6px 14px rgba(36,44,71,0.14))',
                   }}
                 />
               </div>
@@ -140,7 +142,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
               <div
                 style={{
                   padding: '22px 24px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderTop: '1.5px solid var(--line)',
                   display: 'flex',
                   flexDirection: 'column',
                   flex: 1,
@@ -151,7 +153,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                     fontFamily: 'var(--font-sans)',
                     fontSize: '18px',
                     fontWeight: 700,
-                    color: '#FFFFFF',
+                    color: 'var(--ink)',
                     marginBottom: '4px',
                   }}
                 >
@@ -161,8 +163,9 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                   style={{
                     fontFamily: 'var(--font-mono)',
                     fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.6)',
+                    color: 'var(--ink-soft)',
                     marginBottom: '10px',
+                    fontWeight: 500,
                   }}
                 >
                   Blank &middot; ${blank.price.toFixed(2)} USD
@@ -170,7 +173,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
                 <p
                   style={{
                     fontSize: '12.5px',
-                    color: 'rgba(255, 255, 255, 0.55)',
+                    color: 'var(--ink-soft)',
                     lineHeight: 1.5,
                     marginBottom: '20px',
                     flex: 1,
@@ -181,7 +184,7 @@ export const CatalogSection: React.FC<CatalogSectionProps> = ({ onSelectColor })
 
                 <button
                   onClick={() => onSelectColor(blank)}
-                  className="btn btn-primary btn-small"
+                  className="btn btn-primary"
                   style={{ width: '100%', borderRadius: '4px' }}
                 >
                   Customize {blank.name}

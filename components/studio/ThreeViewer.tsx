@@ -79,7 +79,7 @@ export const ThreeViewer: React.FC<ThreeViewerProps> = ({
       if (!res.ok) throw new Error('Sample model file not found');
       const text = await res.text();
       const result = parseOBJ(text);
-      viewerRef.current?.setDesignGeometry(result.geometry.clone(), '#D9631E');
+      viewerRef.current?.setDesignGeometry(result.geometry.clone(), '#6592C5');
       onModelLoaded('ORICAN Star Crest (Sample)');
       onToast('Sample 3D crest placed on proof');
     } catch (err: unknown) {
@@ -149,9 +149,9 @@ export const ThreeViewer: React.FC<ThreeViewerProps> = ({
           title="Load pre-built sample 3D design"
           onClick={handleLoadSample}
           aria-label="Load sample 3D model"
-          style={{ background: '#F6F4EE', borderColor: '#D9631E' }}
+          style={{ background: '#F0EEE6', borderColor: '#6592C5' }}
         >
-          <Sparkles size={18} color="#D9631E" />
+          <Sparkles size={18} color="#6592C5" />
         </button>
       </div>
 

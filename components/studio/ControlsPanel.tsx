@@ -58,7 +58,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       {(modelName || textureName) && (
         <div
           style={{
-            background: 'rgba(23, 21, 15, 0.06)',
+            background: 'rgba(36, 44, 71, 0.05)',
             border: '1px solid var(--line)',
             borderRadius: '4px',
             padding: '10px 14px',
@@ -94,7 +94,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
                 className={`color-dot ${isActive ? 'active' : ''}`}
                 style={{
                   backgroundColor: c.hex,
-                  border: c.hex === '#F6F4EE' ? '1px solid #CFC9BA' : 'none',
+                  border: c.hex === '#F6F4EE' ? '1px solid var(--line)' : 'none',
                 }}
                 onClick={() => onColorChange(c)}
                 title={c.name}
@@ -109,7 +109,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
       <div>
         <div className="field-label">DESIGN SCALE</div>
         <div className="slider-container">
-          <Minus size={14} color="#6B6759" />
+          <Minus size={14} color="var(--ink-soft)" />
           <input
             type="range"
             min="0"
@@ -118,7 +118,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             onChange={(e) => onSliderChange(Number(e.target.value))}
             aria-label="Design scale slider"
           />
-          <Plus size={14} color="#6B6759" />
+          <Plus size={14} color="var(--ink-soft)" />
         </div>
       </div>
 
@@ -148,7 +148,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = ({
             title="Center Reset"
             aria-label="Center Reset"
           >
-            <Dot size={18} color="#D9631E" />
+            <Dot size={18} color="#6592C5" />
           </button>
           <button
             className="dpad-btn right"

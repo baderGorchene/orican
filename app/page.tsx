@@ -839,112 +839,125 @@ export default function Home() {
         </section>
       </div>
 
-      <section style={{ background: '#050608', color: '#fff', padding: '0 0 48px', borderTop: '1px solid rgba(255,255,255,.1)' }}>
+      <section style={{ background: 'var(--paper-surface)', color: 'var(--ink)', padding: '0 0 48px', borderTop: '1.5px solid var(--line)' }}>
         <div className="wrap stats-bar-grid">
           <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 600 }}>12K+</div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.55)', letterSpacing: '.03em' }}>PROOFS GENERATED</div>
+            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>12K+</div>
+            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>PROOFS GENERATED</div>
           </div>
           <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 600 }}>4.9</div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.55)', letterSpacing: '.03em' }}>AVERAGE RATING</div>
+            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>4.9</div>
+            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>AVERAGE RATING</div>
           </div>
           <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 600 }}>98%</div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.55)', letterSpacing: '.03em' }}>FIRST-PRINT ACCURACY</div>
+            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>98%</div>
+            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>FIRST-PRINT ACCURACY</div>
           </div>
           <div>
-            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 600 }}>24h</div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,.55)', letterSpacing: '.03em' }}>TURNAROUND</div>
+            <div style={{ fontFamily: "'Manrope',sans-serif", fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>24h</div>
+            <div style={{ fontSize: '11px', color: 'var(--blue)', letterSpacing: '.06em', fontWeight: 600 }}>TURNAROUND</div>
           </div>
         </div>
       </section>
 
-      <section style={{ background: '#0A0B0D', color: '#fff', padding: '64px 0', borderTop: '1px solid rgba(255,255,255,.1)' }}>
+      <section style={{ background: 'var(--paper)', color: 'var(--ink)', padding: '64px 0', borderTop: '1.5px solid var(--line)' }}>
         <div className="wrap live-studio-grid">
-          <div style={{ position: 'relative', width: 'min(420px,100%)', aspectRatio: '1/1', justifySelf: 'center', border: '1px solid rgba(255,255,255,.16)', borderRadius: '12px', overflow: 'hidden', order: 1 }}>
+          <div style={{ position: 'relative', width: 'min(420px,100%)', aspectRatio: '1/1', justifySelf: 'center', border: '1.5px solid var(--blue)', borderRadius: '12px', overflow: 'hidden', order: 1, background: 'var(--white)', boxShadow: '0 16px 36px -12px rgba(36,44,71,.14)' }}>
             <canvas ref={miniCanvasRef} id="miniCanvas" style={{ width: '100%', height: '100%', display: 'block' }} />
           </div>
           <div style={{ order: 2 }}>
-            <h2 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif", fontSize: 'clamp(26px,3.4vw,38px)', marginBottom: '14px' }}>Design it live, right here</h2>
-            <p style={{ color: 'rgba(255,255,255,.62)', fontSize: '14px', lineHeight: 1.7, maxWidth: '38ch', marginBottom: '24px' }}>Pick a garment color and watch it update in real time &mdash; this is the same live preview you'll use to place your own design.</p>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }} id="heroColorPicker">
-              <div className="dot active" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid #fff', background: '#F6F4EE' }} data-color="#F6F4EE" data-name="Canvas White" />
-              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid transparent', background: '#1B1C1E' }} data-color="#1B1C1E" data-name="Ink Black" />
-              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid transparent', background: '#CBA97A' }} data-color="#CBA97A" data-name="Undyed Natural" />
+            <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '8px' }}>
+              LIVE PROOFING PREVIEW
             </div>
-            <button className="btn" id="thirdCustomize" style={{ fontFamily: "'Manrope',sans-serif" }}>Customize a tee</button>
+            <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontSize: 'clamp(26px,3.4vw,38px)', fontWeight: 700, marginBottom: '14px' }}>Design it live, right here</h2>
+            <p style={{ color: 'var(--ink-soft)', fontSize: '14px', lineHeight: 1.7, maxWidth: '38ch', marginBottom: '24px' }}>Pick a garment color and watch it update in real time &mdash; this is the same live preview you'll use to place your own design.</p>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }} id="heroColorPicker">
+              <div className="dot active" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2.5px solid var(--blue)', background: '#F6F4EE', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#F6F4EE" data-name="Canvas White" />
+              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid rgba(101,146,197,.3)', background: '#1B1C1E', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#1B1C1E" data-name="Ink Black" />
+              <div className="dot" style={{ width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer', border: '2px solid rgba(101,146,197,.3)', background: '#CBA97A', boxShadow: '0 2px 8px rgba(36,44,71,.15)' }} data-color="#CBA97A" data-name="Undyed Natural" />
+            </div>
+            <button className="btn btn-primary" id="thirdCustomize" style={{ fontFamily: "'Manrope',sans-serif" }}>Customize a tee</button>
           </div>
         </div>
       </section>
 
-      <section style={{ background: '#050608', color: '#fff', padding: '8px 0 64px' }}>
+      <section style={{ background: 'var(--paper-surface)', color: 'var(--ink)', padding: '24px 0 64px', borderTop: '1.5px solid var(--line)' }}>
         <div className="wrap">
           <div className="section-head">
-            <h2 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>Built for scrutiny</h2>
-            <p style={{ color: 'rgba(255,255,255,.6)' }}>The white tee, up close &mdash; weave, stitching, and embroidery detail.</p>
+            <div>
+              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
+                GARMENT SCRUTINY
+              </div>
+              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>Built for scrutiny</h2>
+            </div>
+            <p style={{ color: 'var(--ink-soft)' }}>The white tee, up close &mdash; weave, stitching, and embroidery detail.</p>
           </div>
           <div className="scrutiny-grid">
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
               <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_f9db9841-0a2f-47d8-a71f-6054f288935c.png" alt="Macro detail of embroidered logo on white cotton t-shirt" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
               <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_aeb7a148-4bf4-4cba-a335-123d93a5d9db.png" alt="Folded white t-shirt showing fabric weave and seam stitching" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
-            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ aspectRatio: '16/9', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid var(--line)', background: 'var(--white)', boxShadow: '0 8px 24px -8px rgba(36,44,71,.1)' }}>
               <img src="https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_082744_6506c085-41fe-4e67-b573-93c71e87b9a8.png" alt="Close-up of white t-shirt collar with embroidered emblem" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section" id="shop" style={{ background: '#050608', color: '#fff', borderTop: '1px solid rgba(255,255,255,.1)' }}>
+      <section className="section" id="shop" style={{ background: 'var(--paper)', color: 'var(--ink)', borderTop: '1.5px solid var(--line)' }}>
         <div className="wrap">
           <div className="section-head">
-            <h2 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>Pick a blank to start on</h2>
-            <p style={{ color: 'rgba(255,255,255,.6)' }}>Every color opens the same proof frame &mdash; your design carries over.</p>
+            <div>
+              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
+                PREMIUM BLANKS
+              </div>
+              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>Pick a blank to start on</h2>
+            </div>
+            <p style={{ color: 'var(--ink-soft)' }}>Every color opens the same proof frame &mdash; your design carries over.</p>
           </div>
           <div className="grid">
-            <div className="card" style={{ background: 'rgba(255,255,255,.04)', borderColor: 'rgba(255,255,255,.14)' }}>
-              <div className="swatch" style={{ background: 'rgba(255,255,255,.06)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#F6F4EE' }} />
-                <div className="material-badge" style={{ background: 'rgba(5,6,8,.75)', borderColor: 'rgba(255,255,255,.18)', color: '#fff' }}>
-                  <iconify-icon icon="mdi:cotton" />
+            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
+              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
+                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#F6F4EE', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.18))' }} />
+                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
+                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
                   100% cotton
                 </div>
               </div>
-              <div className="body" style={{ borderColor: 'rgba(255,255,255,.14)' }}>
-                <div className="name" style={{ color: '#fff' }}>Canvas White</div>
-                <div className="price" style={{ color: 'rgba(255,255,255,.6)' }}>Blank &middot; $14.00</div>
-                <button className="btn small openFrame" data-color="#F6F4EE">Customize</button>
+              <div className="body" style={{ borderColor: 'var(--line)' }}>
+                <div className="name" style={{ color: 'var(--ink)' }}>Canvas White</div>
+                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $14.00</div>
+                <button className="btn small openFrame" data-color="#F6F4EE" style={{ width: '100%' }}>Customize</button>
               </div>
             </div>
-            <div className="card" style={{ background: 'rgba(255,255,255,.04)', borderColor: 'rgba(255,255,255,.14)' }}>
-              <div className="swatch" style={{ background: 'rgba(255,255,255,.06)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#1B1C1E', filter: 'drop-shadow(0 0 0 #444) drop-shadow(0 0 1px rgba(255,255,255,.4))' }} />
-                <div className="material-badge" style={{ background: 'rgba(5,6,8,.75)', borderColor: 'rgba(255,255,255,.18)', color: '#fff' }}>
-                  <iconify-icon icon="mdi:cotton" />
+            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
+              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
+                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#1B1C1E', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.25))' }} />
+                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
+                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
                   100% cotton
                 </div>
               </div>
-              <div className="body" style={{ borderColor: 'rgba(255,255,255,.14)' }}>
-                <div className="name" style={{ color: '#fff' }}>Ink Black</div>
-                <div className="price" style={{ color: 'rgba(255,255,255,.6)' }}>Blank &middot; $14.00</div>
-                <button className="btn small openFrame" data-color="#1B1C1E">Customize</button>
+              <div className="body" style={{ borderColor: 'var(--line)' }}>
+                <div className="name" style={{ color: 'var(--ink)' }}>Ink Black</div>
+                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $14.00</div>
+                <button className="btn small openFrame" data-color="#1B1C1E" style={{ width: '100%' }}>Customize</button>
               </div>
             </div>
-            <div className="card" style={{ background: 'rgba(255,255,255,.04)', borderColor: 'rgba(255,255,255,.14)' }}>
-              <div className="swatch" style={{ background: 'rgba(255,255,255,.06)' }}>
-                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#CBA97A' }} />
-                <div className="material-badge" style={{ background: 'rgba(5,6,8,.75)', borderColor: 'rgba(255,255,255,.18)', color: '#fff' }}>
-                  <iconify-icon icon="mdi:cotton" />
+            <div className="card" style={{ background: 'var(--white)', borderColor: 'var(--line)', boxShadow: '0 12px 30px -12px rgba(36,44,71,.12)' }}>
+              <div className="swatch" style={{ background: 'var(--paper-surface)' }}>
+                <iconify-icon icon="mdi:tshirt-crew" style={{ fontSize: '96px', color: '#CBA97A', filter: 'drop-shadow(0 4px 12px rgba(36,44,71,.18))' }} />
+                <div className="material-badge" style={{ background: 'rgba(240,238,230,.92)', borderColor: 'var(--blue)', color: 'var(--ink)' }}>
+                  <iconify-icon icon="mdi:cotton" style={{ color: 'var(--blue)' }} />
                   100% cotton
                 </div>
               </div>
-              <div className="body" style={{ borderColor: 'rgba(255,255,255,.14)' }}>
-                <div className="name" style={{ color: '#fff' }}>Undyed Natural</div>
-                <div className="price" style={{ color: 'rgba(255,255,255,.6)' }}>Blank &middot; $15.00</div>
-                <button className="btn small openFrame" data-color="#CBA97A">Customize</button>
+              <div className="body" style={{ borderColor: 'var(--line)' }}>
+                <div className="name" style={{ color: 'var(--ink)' }}>Undyed Natural</div>
+                <div className="price" style={{ color: 'var(--ink-soft)' }}>Blank &middot; $15.00</div>
+                <button className="btn small openFrame" data-color="#CBA97A" style={{ width: '100%' }}>Customize</button>
               </div>
             </div>
           </div>
@@ -952,46 +965,51 @@ export default function Home() {
 
         <div className="wrap" style={{ marginTop: '64px' }}>
           <div className="section-head">
-            <h2 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>How the proof frame works</h2>
+            <div>
+              <div style={{ fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace", color: 'var(--blue)', letterSpacing: '.08em', fontWeight: 600, marginBottom: '6px' }}>
+                METHODOLOGY
+              </div>
+              <h2 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 700 }}>How the proof frame works</h2>
+            </div>
           </div>
           <div className="steps">
-            <div className="step" style={{ borderColor: 'rgba(255,255,255,.25)' }}>
-              <iconify-icon className="step-icon" icon="mdi:cloud-upload-outline" style={{ color: '#fff' }} />
-              <h3 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>Upload your design in 3D</h3>
-              <p style={{ color: 'rgba(255,255,255,.6)' }}>Drop a design file onto any blank. It reads straight into the proof frame.</p>
+            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
+              <iconify-icon className="step-icon" icon="mdi:cloud-upload-outline" style={{ color: 'var(--blue)' }} />
+              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>Upload your design in 3D</h3>
+              <p style={{ color: 'var(--ink-soft)' }}>Drop a design file onto any blank. It reads straight into the proof frame.</p>
             </div>
-            <div className="step" style={{ borderColor: 'rgba(255,255,255,.25)' }}>
-              <iconify-icon className="step-icon" icon="mdi:cube-scan" style={{ color: '#fff' }} />
-              <h3 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>The frame opens on the shirt</h3>
-              <p style={{ color: 'rgba(255,255,255,.6)' }}>A live 3D proof opens right on the garment &mdash; not a flat sticker.</p>
+            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
+              <iconify-icon className="step-icon" icon="mdi:cube-scan" style={{ color: 'var(--blue)' }} />
+              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>The frame opens on the shirt</h3>
+              <p style={{ color: 'var(--ink-soft)' }}>A live 3D proof opens right on the garment &mdash; not a flat sticker.</p>
             </div>
-            <div className="step" style={{ borderColor: 'rgba(255,255,255,.25)' }}>
-              <iconify-icon className="step-icon" icon="mdi:check-decagram-outline" style={{ color: '#fff' }} />
-              <h3 style={{ color: '#fff', fontFamily: "'Manrope',sans-serif" }}>Approve, then it goes to press</h3>
-              <p style={{ color: 'rgba(255,255,255,.6)' }}>Once the proof looks right, the same file is what gets printed.</p>
+            <div className="step" style={{ borderLeft: '2.5px solid var(--blue)', paddingLeft: '18px' }}>
+              <iconify-icon className="step-icon" icon="mdi:check-decagram-outline" style={{ color: 'var(--blue)' }} />
+              <h3 style={{ color: 'var(--ink)', fontFamily: "'Manrope',sans-serif", fontWeight: 600 }}>Approve, then it goes to press</h3>
+              <p style={{ color: 'var(--ink-soft)' }}>Once the proof looks right, the same file is what gets printed.</p>
             </div>
           </div>
         </div>
       </section>
 
       <section style={{ position: 'relative', minHeight: '70vh', display: 'flex', alignItems: 'flex-end', background: "url('https://d8j0ntlcm91z4.cloudfront.net/user_3CEJb1vs8I6xgnavY3H6CRY4bSJ/hf_20260915_081447_70ad87e7-29a2-4c17-94d6-02871420d66f.png') center/cover no-repeat" }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, #050608 5%, rgba(5,6,8,.35) 55%, rgba(5,6,8,.1) 100%)' }} />
-        <div className="wrap" style={{ position: 'relative', padding: '64px 40px 56px', color: '#fff' }}>
-          <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 600, fontSize: 'clamp(28px,4.5vw,52px)', lineHeight: 1.25, letterSpacing: '-.02em', maxWidth: '640px', marginBottom: '22px', color: '#fff' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, #242C47 15%, rgba(36,44,71,.75) 60%, rgba(101,146,197,.2) 100%)' }} />
+        <div className="wrap" style={{ position: 'relative', padding: '64px 40px 56px', color: 'var(--paper)' }}>
+          <h2 style={{ fontFamily: "'Manrope',sans-serif", fontWeight: 700, fontSize: 'clamp(28px,4.5vw,52px)', lineHeight: 1.25, letterSpacing: '-.02em', maxWidth: '640px', marginBottom: '22px', color: 'var(--paper)', textShadow: '0 2px 16px rgba(0,0,0,.45)' }}>
             One proof. No surprises. The shirt you saw is the shirt you get.
           </h2>
-          <button className="btn" id="storyCustomize" style={{ fontFamily: "'Manrope',sans-serif" }}>Start designing</button>
+          <button className="btn" id="storyCustomize" style={{ fontFamily: "'Manrope',sans-serif", background: 'var(--paper)', color: 'var(--ink)', borderColor: 'var(--paper)' }}>Start designing</button>
         </div>
       </section>
 
-      <footer style={{ background: '#050608', color: 'rgba(255,255,255,.55)', borderTop: '1px solid rgba(255,255,255,.1)' }}>
-        <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
-            <span>ORICAN &mdash; a print-on-demand studio</span>
-            <span>Prototype preview</span>
+      <footer style={{ background: 'var(--navy)', color: 'rgba(240,238,230,.75)', borderTop: '1.5px solid rgba(101,146,197,.3)', padding: '40px 0 50px' }}>
+        <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <span style={{ fontWeight: 700, color: 'var(--paper)', letterSpacing: '.04em' }}>ORICAN &mdash; a print-on-demand studio</span>
+            <span style={{ fontSize: '11px', color: 'var(--blue)', fontFamily: "'IBM Plex Mono',monospace" }}>3D Vector Proofing Engine Active</span>
           </div>
-          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,.35)' }}>
-            Photos via Unsplash: Mark Bishop, Egor Ivlev, Foto Bakirkoy &middot; studio image AI-generated
+          <div style={{ fontSize: '11px', color: 'rgba(240,238,230,.45)' }}>
+            Curated 60-30-10 palette in Natural Linen (#F0EEE6), Slate Blue (#6592C5), and Midnight Slate (#242C47) &middot; &copy; {new Date().getFullYear()} ORICAN Studio. All rights reserved.
           </div>
         </div>
       </footer>

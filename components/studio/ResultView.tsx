@@ -102,12 +102,12 @@ export const ResultView: React.FC<ResultViewProps> = ({
               gap: '6px',
               fontFamily: 'var(--font-mono)',
               fontSize: '11px',
-              color: 'var(--accent-orange)',
+              color: '#6592C5',
               fontWeight: 600,
               marginBottom: '6px',
             }}
           >
-            <CheckCircle2 size={14} color="#D9631E" />
+            <CheckCircle2 size={14} color="#6592C5" />
             PROOF ACCURACY CERTIFIED
           </div>
 
@@ -138,7 +138,7 @@ export const ResultView: React.FC<ResultViewProps> = ({
           {/* Garment Summary Pill */}
           <div
             style={{
-              background: 'rgba(255, 255, 255, 0.65)',
+              background: 'var(--paper-surface)',
               border: '1px solid var(--line)',
               borderRadius: '4px',
               padding: '10px 14px',

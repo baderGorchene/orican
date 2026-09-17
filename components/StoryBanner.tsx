@@ -26,7 +26,7 @@ export const StoryBanner: React.FC<StoryBannerProps> = ({ onOpenStudio }) => {
           position: 'absolute',
           inset: 0,
           background:
-            'linear-gradient(0deg, #050608 10%, rgba(5, 6, 8, 0.45) 60%, rgba(5, 6, 8, 0.2) 100%)',
+            'linear-gradient(0deg, #242C47 15%, rgba(36, 44, 71, 0.75) 60%, rgba(101, 146, 197, 0.2) 100%)',
         }}
       />
       <div
@@ -34,7 +34,7 @@ export const StoryBanner: React.FC<StoryBannerProps> = ({ onOpenStudio }) => {
         style={{
           position: 'relative',
           padding: '80px 32px 70px',
-          color: '#FFFFFF',
+          color: 'var(--paper)',
           width: '100%',
         }}
       >
@@ -47,7 +47,7 @@ export const StoryBanner: React.FC<StoryBannerProps> = ({ onOpenStudio }) => {
             maxWidth: '680px',
             lineHeight: 1.15,
             marginBottom: '28px',
-            color: '#FFFFFF',
+            color: 'var(--paper)',
             textShadow: '0 3px 18px rgba(0, 0, 0, 0.5)',
           }}
         >
@@ -56,8 +56,8 @@ export const StoryBanner: React.FC<StoryBannerProps> = ({ onOpenStudio }) => {
 
         <button
           onClick={onOpenStudio}
-          className="btn btn-primary"
-          style={{ padding: '14px 32px' }}
+          className="btn"
+          style={{ padding: '14px 32px', background: 'var(--paper)', color: 'var(--ink)', borderColor: 'var(--paper)' }}
         >
           Start designing now
           <ArrowRight size={16} />

@@ -4,19 +4,19 @@ import { UploadCloud, Box, CheckCheck } from 'lucide-react';
 export const WorkflowSteps: React.FC = () => {
   const steps = [
     {
-      icon: <UploadCloud size={28} color="#D9631E" />,
+      icon: <UploadCloud size={28} color="#6592C5" />,
       num: 'STEP 01',
       title: 'Upload your design in 3D',
       desc: 'Drop an .OBJ 3D file or graphic texture directly onto any blank. It reads straight into the proof frame with normalized geometry.',
     },
     {
-      icon: <Box size={28} color="#D9631E" />,
+      icon: <Box size={28} color="#6592C5" />,
       num: 'STEP 02',
       title: 'The frame opens on the shirt',
       desc: 'Inspect a live 3D proof right on the garment &mdash; rotate around the contours, tune scale, and check chest bounds.',
     },
     {
-      icon: <CheckCheck size={28} color="#D9631E" />,
+      icon: <CheckCheck size={28} color="#6592C5" />,
       num: 'STEP 03',
       title: 'Approve, then it goes to press',
       desc: 'Once the proof looks right, the high-res clipped print file is what gets sent straight to the industrial press.',
@@ -26,10 +26,10 @@ export const WorkflowSteps: React.FC = () => {
   return (
     <section
       style={{
-        background: '#0A0B0D',
-        color: '#FFFFFF',
+        background: 'var(--paper-surface)',
+        color: 'var(--ink)',
         padding: '90px 0',
-        borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+        borderTop: '1.5px solid var(--line)',
       }}
     >
       <div className="wrap">
@@ -38,9 +38,10 @@ export const WorkflowSteps: React.FC = () => {
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '11px',
-              color: 'var(--accent-orange)',
+              color: 'var(--blue)',
               letterSpacing: '0.08em',
               marginBottom: '8px',
+              fontWeight: 600,
             }}
           >
             PRECISION METHODOLOGY
@@ -51,7 +52,7 @@ export const WorkflowSteps: React.FC = () => {
               fontSize: 'clamp(28px, 3.2vw, 40px)',
               fontWeight: 700,
               letterSpacing: '-0.02em',
-              color: '#FFFFFF',
+              color: 'var(--ink)',
             }}
           >
             How the proof frame works.
@@ -70,7 +71,7 @@ export const WorkflowSteps: React.FC = () => {
             <div
               key={i}
               style={{
-                borderLeft: '2px solid var(--accent-orange)',
+                borderLeft: '2.5px solid var(--blue)',
                 paddingLeft: '24px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -81,7 +82,7 @@ export const WorkflowSteps: React.FC = () => {
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '11px',
-                  color: 'var(--accent-orange)',
+                  color: 'var(--blue)',
                   fontWeight: 600,
                   marginBottom: '8px',
                 }}
@@ -92,8 +93,8 @@ export const WorkflowSteps: React.FC = () => {
                 style={{
                   fontFamily: 'var(--font-sans)',
                   fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  color: 'var(--ink)',
                   marginBottom: '10px',
                 }}
               >
@@ -103,7 +104,7 @@ export const WorkflowSteps: React.FC = () => {
                 style={{
                   fontSize: '13.5px',
                   lineHeight: 1.65,
-                  color: 'rgba(255, 255, 255, 0.62)',
+                  color: 'var(--ink-soft)',
                 }}
               >
                 {s.desc}
