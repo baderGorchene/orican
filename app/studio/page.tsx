@@ -73,6 +73,31 @@ export default function StudioPage() {
     }, 2400);
   };
 
+  // Preload garment model and color from URL parameters if launched from Landing Page
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const modelParam = params.get('model');
+    const colorParam = params.get('color');
+
+    if (modelParam) {
+      const found = GARMENT_MODELS.find((m) => m.id === modelParam);
+      if (found) {
+        setSelectedModel(found);
+        viewerRef.current?.setGarmentModel?.(found);
+      }
+    }
+    if (colorParam) {
+      const foundColor = STANDARD_COLORS.find(
+        (c) => c.hex.toLowerCase() === colorParam.toLowerCase()
+      );
+      if (foundColor) {
+        setSelectedColor(foundColor);
+        viewerRef.current?.setColor(foundColor.hex);
+      }
+    }
+  }, []);
+
   // Initialize WebGL Garment Viewer
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
