@@ -1,22 +1,32 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
   Box,
   Check,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Layers,
+  MessageCircle,
+  Package,
   Palette,
   Rotate3d,
   Scissors,
   ShieldCheck,
   Sparkles,
+  Truck,
 } from 'lucide-react';
-import { GARMENT_MODELS } from '@/lib/constants';
+import {
+  GARMENT_MODELS,
+  SHIRT_PATH_D,
+  HOODIE_PATH_D,
+  PANTS_PATH_D,
+  JACKET_PATH_D,
+} from '@/lib/constants';
 import { GarmentCategory, ModelTier } from '@/lib/types';
 import { useLenis } from 'lenis/react';
 import gsap from 'gsap';
@@ -31,12 +41,23 @@ export default function LandingPage() {
   const scrubCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const scrubWrapRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLElement | null>(null);
+  const carouselTrackRef = useRef<HTMLDivElement | null>(null);
+  const renderFrameRef = useRef<(idx: number) => void>(() => {});
+
+  // Direct Interactive Rotation State (0° to 360°)
+  const [rotationAngle, setRotationAngle] = useState<number>(0);
+  const isDraggingCanvas = useRef<boolean>(false);
+  const dragStartX = useRef<number>(0);
+  const dragStartAngle = useRef<number>(0);
 
   // Category showcase active tab in landing page
   const [activeCategory, setActiveCategory] = useState<GarmentCategory>('tops');
 
   // Interactive color swatches for garment cards
   const [cardColors, setCardColors] = useState<Record<string, string>>({});
+
+  // Active step for visual explainer carousel ("Comment ça fonctionne en image")
+  const [activeExplainerStep, setActiveExplainerStep] = useState<number>(0);
 
   const SWATCHES = [
     { id: 'white', name: 'Canvas White', hex: '#F6F4EE' },
@@ -46,9 +67,118 @@ export default function LandingPage() {
     { id: 'magenta', name: 'Process Magenta', hex: '#DD0072' },
   ];
 
+  // Visual Explainer Step Definitions
+  const EXPLAINER_STEPS = [
+    {
+      step: 1,
+      title: '1. Choisissez votre silhouette',
+      desc: 'Sélectionnez parmi nos modèles pré-calibrés : T-Shirt 240 GSM, Hoodie Drop-Shoulder, Pantalon ou Veste technique. Chaque modèle intègre les tolérances exactes de nos plateaux de presse.',
+      renderVisual: () => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ padding: '16px', background: 'rgba(101,146,197,0.12)', borderRadius: '12px', border: '1.5px solid var(--blue)', boxShadow: '0 4px 14px rgba(101,146,197,0.15)' }}>
+              <svg viewBox="0 0 508 508" style={{ width: '70px', height: '70px' }}>
+                <path d={SHIRT_PATH_D} fill="#242C47" />
+              </svg>
+            </div>
+            <div style={{ padding: '16px', background: 'rgba(101,146,197,0.06)', borderRadius: '12px', border: '1px solid var(--line)' }}>
+              <svg viewBox="0 0 512 512" style={{ width: '70px', height: '70px' }}>
+                <path d={HOODIE_PATH_D} fill="#6592C5" opacity="0.65" />
+              </svg>
+            </div>
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink)', letterSpacing: '.04em' }}>
+            Blanks certifi&eacute;s 240 &agrave; 420 GSM
+          </span>
+        </div>
+      ),
+    },
+    {
+      step: 2,
+      title: '2. D&eacute;posez votre mesh 3D ou visuel',
+      desc: 'Importez vos fichiers 3D Wavefront .OBJ ou vos fichiers graphiques vectoriels/raster. D&eacute;pliage UV planaire automatique, centrage dynamique et alignement au millim&egrave;tre pr&egrave;s.',
+      renderVisual: () => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
+          <div style={{ width: '140px', height: '94px', border: '2px dashed var(--blue)', borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(101,146,197,0.08)' }}>
+            <Layers size={30} color="var(--blue)" />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--ink)', marginTop: '6px' }}>
+              .OBJ &middot; SVG &middot; PNG
+            </span>
+          </div>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--ink)', letterSpacing: '.04em' }}>
+            D&eacute;pliage UV planaire instantan&eacute;
+          </span>
+        </div>
+      ),
+    },
+    {
+      step: 3,
+      title: '3. Calibrez et lancez en presse',
+      desc: 'Visualisez les plans de d&eacute;limitation mat&eacute;rielle GPU. Ce que vous validez &agrave; l&rsquo;&eacute;cran correspond fid&egrave;lement au placement sous la presse s&eacute;rigraphique ou DTG.',
+      renderVisual: () => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', background: 'rgba(16,185,129,0.12)', border: '1.5px solid #10B981', borderRadius: '999px', color: '#065F46', fontWeight: 700, fontSize: '13px' }}>
+            <CheckCircle2 size={18} color="#10B981" />
+            <span>BAT 3D Conforme &bull; 0 Erreur</span>
+          </div>
+          <span style={{ fontSize: '12px', color: 'var(--ink-soft)' }}>
+            Export JPG HD &amp; Fichier RIP PNG d&eacute;limit&eacute;
+          </span>
+        </div>
+      ),
+    },
+  ];
+
+  // Direct Slider & Angle Change Handler
+  const handleSliderChange = useCallback((angle: number) => {
+    const normalized = ((angle % 360) + 360) % 360;
+    setRotationAngle(normalized);
+    const TOTAL_FRAMES = 270;
+    const targetIdx = Math.min(
+      TOTAL_FRAMES,
+      Math.max(1, Math.round((normalized / 360) * (TOTAL_FRAMES - 1)) + 1)
+    );
+    renderFrameRef.current(targetIdx);
+  }, []);
+
+  // Canvas Drag-to-Rotate Pointer Handlers
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    isDraggingCanvas.current = true;
+    dragStartX.current = e.clientX;
+    dragStartAngle.current = rotationAngle;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDraggingCanvas.current) return;
+    const deltaX = e.clientX - dragStartX.current;
+    // 1px drag = ~0.65 degrees rotation
+    const newAngle = dragStartAngle.current - deltaX * 0.65;
+    handleSliderChange(Math.round(newAngle));
+  };
+
+  const handleCanvasPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isDraggingCanvas.current) {
+      isDraggingCanvas.current = false;
+      try {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        // ignore pointer capture release if not active
+      }
+    }
+  };
+
+  // Carousel Arrow Navigation
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    if (carouselTrackRef.current) {
+      const scrollAmount = direction === 'left' ? -340 : 340;
+      carouselTrackRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   // Category tab switch smooth stagger
   useEffect(() => {
-    const cards = document.querySelectorAll('#garments .card');
+    const cards = document.querySelectorAll('#garments .carousel-card');
     if (cards.length > 0) {
       gsap.fromTo(
         cards,
@@ -113,6 +243,8 @@ export default function LandingPage() {
       ctx.drawImage(imgToDraw, drawX, drawY, drawW, drawH);
     }
 
+    renderFrameRef.current = renderFrame;
+
     function resizeCanvas() {
       if (!canvas) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -170,6 +302,7 @@ export default function LandingPage() {
         end: 'bottom bottom',
         scrub: 0.5,
         onUpdate: (self) => {
+          if (isDraggingCanvas.current) return;
           const p = self.progress;
           const frameIdx = Math.min(
             TOTAL_FRAMES,
@@ -178,99 +311,12 @@ export default function LandingPage() {
           if (frameIdx !== currentFrameIdx) {
             currentFrameIdx = frameIdx;
             renderFrame(frameIdx);
+            setRotationAngle(Math.round(p * 360));
           }
-
-          // Active angle chip sync
-          const angleChips = document.querySelectorAll('.angle-chips-row .angle-chip');
-          const activeAngleIdx = p >= 0.82 ? 3 : p >= 0.55 ? 2 : p >= 0.22 ? 1 : 0;
-          angleChips.forEach((chip, idx) => {
-            chip.classList.toggle('active', idx === activeAngleIdx);
-          });
         },
       });
 
-      // 2. Multi-phase hero narrative typography choreography
-      const step0 = document.getElementById('stageStep0');
-      const step1 = document.getElementById('stageStep1');
-      const step2 = document.getElementById('stageStep2');
-      const dots = document.querySelectorAll('.stage-step-indicators .step-dot');
-
-      if (step0 && step1 && step2) {
-        gsap.set(step0, { autoAlpha: 1, y: 0, filter: 'blur(0px)' });
-        gsap.set([step1, step2], { autoAlpha: 0, y: 28, filter: 'blur(12px)' });
-
-        const stageTl = gsap.timeline({
-          scrollTrigger: {
-            trigger: wrap,
-            start: 'top top',
-            end: 'bottom bottom',
-            scrub: 0.5,
-            onUpdate: (self) => {
-              const p = self.progress;
-              const activeDot = p >= 0.64 ? 2 : p >= 0.30 ? 1 : 0;
-              dots.forEach((dot, idx) => {
-                dot.classList.toggle('active', idx === activeDot);
-              });
-            },
-          },
-        });
-
-        // Phase 0: Holds until 0.26, then dissolves upward
-        stageTl.to(
-          step0,
-          {
-            autoAlpha: 0,
-            y: -26,
-            filter: 'blur(10px)',
-            ease: 'power2.inOut',
-            duration: 0.08,
-          },
-          0.26
-        );
-
-        // Phase 1: Enters from below 0.30 to 0.38
-        stageTl.fromTo(
-          step1,
-          { autoAlpha: 0, y: 26, filter: 'blur(10px)' },
-          {
-            autoAlpha: 1,
-            y: 0,
-            filter: 'blur(0px)',
-            ease: 'power2.inOut',
-            duration: 0.08,
-          },
-          0.30
-        );
-
-        // Phase 1: Dissolves upward 0.58 to 0.66
-        stageTl.to(
-          step1,
-          {
-            autoAlpha: 0,
-            y: -26,
-            filter: 'blur(10px)',
-            ease: 'power2.inOut',
-            duration: 0.08,
-          },
-          0.58
-        );
-
-        // Phase 2: Enters from below 0.62 to 0.70
-        stageTl.fromTo(
-          step2,
-          { autoAlpha: 0, y: 26, filter: 'blur(10px)' },
-          {
-            autoAlpha: 1,
-            y: 0,
-            filter: 'blur(0px)',
-            ease: 'power2.inOut',
-            duration: 0.08,
-          },
-          0.62
-        );
-      }
-
-      // 3. Scroll-triggered section reveals for solid sections below
+      // 2. Scroll-triggered section reveals for solid sections below
       document.querySelectorAll('.scroll-reveal-section').forEach((sec) => {
         ScrollTrigger.create({
           trigger: sec,
@@ -280,7 +326,7 @@ export default function LandingPage() {
         });
       });
 
-      // 4. Tactile magnetic button hover micro-interactions
+      // 3. Tactile magnetic button hover micro-interactions
       const magneticTargets = document.querySelectorAll('.stage-try, .btn-magnetic');
       magneticTargets.forEach((btn) => {
         const el = btn as HTMLElement;
@@ -304,52 +350,6 @@ export default function LandingPage() {
       });
     });
 
-    // Angle Chips Click: Rotate to presets
-    const angleChips = document.querySelectorAll('.angle-chips-row .angle-chip');
-    const handleAngleClick = (e: Event) => {
-      const btn = e.currentTarget as HTMLElement;
-      const angle = btn.getAttribute('data-angle');
-      if (!wrap) return;
-      const scrollable = wrap.offsetHeight - window.innerHeight;
-      const angleRatios: Record<string, number> = {
-        '0': 0.02,
-        '90': 0.33,
-        '180': 0.66,
-        '270': 0.95,
-      };
-      const ratio = angleRatios[angle || '0'] ?? 0.02;
-      const targetScroll = wrap.offsetTop + scrollable * ratio;
-      if (lenis) {
-        lenis.scrollTo(targetScroll, { duration: 1.2 });
-      } else {
-        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
-      }
-    };
-
-    angleChips.forEach((chip) => {
-      chip.addEventListener('click', handleAngleClick);
-    });
-
-    // Step dots navigation click
-    const indicatorDots = document.querySelectorAll('.stage-step-indicators .step-dot');
-    const handleDotClick = (e: Event) => {
-      const dot = e.currentTarget as HTMLElement;
-      const stepTarget = parseInt(dot.getAttribute('data-step') || '0', 10);
-      if (!wrap) return;
-      const scrollable = wrap.offsetHeight - window.innerHeight;
-      const targetRatios = [0.06, 0.46, 0.82];
-      const targetScroll = wrap.offsetTop + scrollable * targetRatios[stepTarget];
-      if (lenis) {
-        lenis.scrollTo(targetScroll, { duration: 1.2 });
-      } else {
-        window.scrollTo({ top: targetScroll, behavior: 'smooth' });
-      }
-    };
-
-    indicatorDots.forEach((dot) => {
-      dot.addEventListener('click', handleDotClick);
-    });
-
     const handleResize = () => {
       resizeCanvas();
       ScrollTrigger.refresh();
@@ -359,16 +359,10 @@ export default function LandingPage() {
 
     return () => {
       clearTimeout(preloadTimer);
-      angleChips.forEach((chip) => {
-        chip.removeEventListener('click', handleAngleClick);
-      });
-      indicatorDots.forEach((dot) => {
-        dot.removeEventListener('click', handleDotClick);
-      });
       window.removeEventListener('resize', handleResize);
       ctx.revert();
     };
-  }, [lenis]);
+  }, []);
 
   // Filter models for category showcase
   const categoryModels = GARMENT_MODELS.filter(
@@ -382,11 +376,12 @@ export default function LandingPage() {
         {/* ================= HERO PINNED SCRUB SECTION ================= */}
         <div
           className="scrub-wrap"
-          id="scrubWrap"
+          id="hero"
           ref={scrubWrapRef}
           style={{ position: 'relative', height: '300vh', background: 'var(--paper)' }}
         >
           <section className="stage" ref={stageRef} style={{ position: 'sticky', top: 0, height: '100vh', background: 'var(--paper)' }}>
+            {/* Header with Navigation Links as requested by Client ("Home", "Proof", etc.) */}
             <header className="stage-header" id="stageHeader">
               <Link className="stage-brand" id="stageBrand" href="/" aria-label="ORICAN Home">
                 <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -397,167 +392,420 @@ export default function LandingPage() {
                 <span className="stage-brand__name">ORICAN</span>
               </Link>
 
-              <div className="stage-meta" id="stageMeta">
-                <span id="stageMeta1">
-                  <span
-                    style={{
-                      width: '7px',
-                      height: '7px',
-                      borderRadius: '50%',
-                      backgroundColor: '#10B981',
-                      boxShadow: '0 0 8px #10B981',
-                      display: 'inline-block',
-                    }}
-                  />
-                  Live 3D Press Engine
-                </span>
-                <span id="stageMeta2">Print what you actually designed</span>
-              </div>
+              {/* Explicit Navigation Links ("Home", "Proof", "Specs", "Catalog") */}
+              <nav className="stage-nav-links" aria-label="Main Navigation">
+                <a
+                  href="#hero"
+                  className="stage-nav-link active"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (lenis) lenis.scrollTo(0, { duration: 1.2 });
+                    else window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                >
+                  Home
+                </a>
+                <Link href="/studio" className="stage-nav-link">
+                  Proof
+                </Link>
+                <a
+                  href="#specs"
+                  className="stage-nav-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (lenis) lenis.scrollTo('#specs', { duration: 1.2 });
+                    else document.getElementById('specs')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Quality
+                </a>
+                <a
+                  href="#garments"
+                  className="stage-nav-link"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (lenis) lenis.scrollTo('#garments', { duration: 1.2 });
+                    else document.getElementById('garments')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Catalog
+                </a>
+              </nav>
 
-              <Link href="/studio" className="stage-try btn-magnetic" id="stageCustomize">
-                <span>Launch 3D Studio</span>
-                <ArrowRight size={14} style={{ marginLeft: '6px' }} />
-              </Link>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <Link href="/studio" className="stage-try btn-magnetic" id="stageCustomize">
+                  <span>Launch 3D Studio</span>
+                  <ArrowRight size={14} style={{ marginLeft: '6px' }} />
+                </Link>
+              </div>
             </header>
 
-            {/* Split Editorial Hero: Left Copy, Right Unobstructed 3D Viewport */}
+            {/* Split Editorial Hero: Left Clean Header ("Home / Model"), Right 3D Viewport with Rotation Controls */}
             <div className="hero-split-grid">
-              {/* Left Column: Narrative Copy & Angle Deck */}
+              {/* Left Column: Clean Product Identification as Redlined ("Home / Model") */}
               <div className="hero-text-col">
-                <div className="stage-copy-split">
-                  {/* Prompt 1 */}
-                  <div className="stage-step-split active" id="stageStep0">
-                    <div className="phase-badge">
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)', display: 'inline-block' }} />
-                      PHASE 01 // DIGITAL REGISTRATION
+                <div className="hero-clean-header">
+                  <div className="hero-clean-tag">
+                    <Sparkles size={12} color="var(--blue)" />
+                    <span>3D DIGITAL REGISTRATION // ARCHETYPE 01</span>
+                  </div>
+
+                  <h1 className="hero-clean-title">
+                    <span>Home</span>
+                    <span className="hero-model-sub">3D Model Viewport</span>
+                  </h1>
+
+                  <p style={{ color: 'var(--ink-soft)', fontSize: '14px', lineHeight: 1.6, margin: 0 }}>
+                    A real-time 3D simulation bridge connecting digital artwork directly to industrial screen print &amp; DTG presses with sub-millimeter precision.
+                  </p>
+
+                  <div className="hero-spec-pills">
+                    <div className="hero-spec-pill">
+                      <Check size={14} color="var(--blue)" />
+                      <span>100% Heavyweight Organic Cotton (240 GSM)</span>
                     </div>
-                    <h1 id="stageTitle0">
-                      <span>Customize</span> <span>like a Pro</span>
-                    </h1>
-                    <p id="stageCaption0">
-                      A real-time 3D simulation bridge connecting digital 3D meshes &amp; vector art directly to industrial screen print and DTG presses with sub-millimeter registration.
-                    </p>
-                    <div>
-                      <Link href="/studio" className="btn-hero-primary btn-magnetic">
-                        <Sparkles size={16} color="var(--blue)" />
-                        <span>Enter 3D Studio &mdash; Try It Free</span>
-                        <ArrowRight size={15} />
-                      </Link>
+                    <div className="hero-spec-pill">
+                      <Check size={14} color="var(--blue)" />
+                      <span>Calibrated 300 &times; 260 mm Press Platen</span>
+                    </div>
+                    <div className="hero-spec-pill">
+                      <Check size={14} color="var(--blue)" />
+                      <span>Direct 360&deg; Interactive Rotation &amp; Drape Audit</span>
                     </div>
                   </div>
 
-                  {/* Prompt 2 */}
-                  <div className="stage-step-split" id="stageStep1">
-                    <div className="phase-badge">
-                      <Rotate3d size={12} color="var(--blue)" />
-                      PHASE 02 // 360&deg; HARDWARE CAD
-                    </div>
-                    <h1 id="stageTitle1">
-                      <span>Rotate &amp; Inspect</span> <span>in 360&deg;</span>
-                    </h1>
-                    <p id="stageCaption1">
-                      Audit garment drape, studio lighting, seam interactions, and hardware clipping boundaries from every rotational angle before a single drop of ink touches fabric.
-                    </p>
-                    <div>
-                      <Link href="/studio" className="btn-hero-primary btn-magnetic">
-                        <Rotate3d size={16} color="var(--blue)" />
-                        <span>Inspect in 3D Studio</span>
-                        <ArrowRight size={15} />
-                      </Link>
-                    </div>
-                  </div>
-
-                  {/* Prompt 3 */}
-                  <div className="stage-step-split" id="stageStep2">
-                    <div className="phase-badge">
-                      <Layers size={12} color="var(--blue)" />
-                      PHASE 03 // FULL SILHOUETTES
-                    </div>
-                    <h1 id="stageTitle2">
-                      <span>Beyond T-Shirts:</span> <span>Hoodies &amp; Pants</span>
-                    </h1>
-                    <p id="stageCaption2">
-                      Extend your apparel line across full silhouettes&mdash;hoodies with kangaroo pocket offsets, relaxed sweatpants, cargo trousers, and weather-resistant outerwear.
-                    </p>
-                    <div>
-                      <Link href="/studio" className="btn-hero-primary btn-magnetic">
-                        <Layers size={16} color="var(--blue)" />
-                        <span>Try Multi-Garment Studio</span>
-                        <ArrowRight size={15} />
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Angle Chips Deck */}
-                <div className="angle-chips-deck">
-                  <div className="angle-chips-title">
-                    <Rotate3d size={12} />
-                    <span>360&deg; Camera Presets</span>
-                  </div>
-                  <div className="angle-chips-row" aria-label="Camera angle presets">
-                    <button type="button" className="angle-chip active" data-angle="0">
-                      0&deg; Front
-                    </button>
-                    <button type="button" className="angle-chip" data-angle="90">
-                      90&deg; &frac34; Drape
-                    </button>
-                    <button type="button" className="angle-chip" data-angle="180">
-                      180&deg; Profile
-                    </button>
-                    <button type="button" className="angle-chip" data-angle="270">
-                      270&deg; Back
-                    </button>
-                  </div>
-
-                  {/* Step Navigation Dots */}
-                  <div className="stage-step-indicators" aria-label="Hero scrub phases">
-                    <button
-                      type="button"
-                      className="step-dot active"
-                      data-step="0"
-                      aria-label="Phase 1: Customize like a Pro"
-                    />
-                    <button
-                      type="button"
-                      className="step-dot"
-                      data-step="1"
-                      aria-label="Phase 2: Rotate and Inspect"
-                    />
-                    <button
-                      type="button"
-                      className="step-dot"
-                      data-step="2"
-                      aria-label="Phase 3: Extended Garment Proofing"
-                    />
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <Link href="/studio" className="btn-hero-primary btn-magnetic">
+                      <Sparkles size={15} color="var(--blue)" />
+                      <span>Open in 3D Studio</span>
+                      <ArrowRight size={14} />
+                    </Link>
+                    <a
+                      href="#garments"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (lenis) lenis.scrollTo('#garments', { duration: 1.2 });
+                        else document.getElementById('garments')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="btn btn-secondary btn-magnetic"
+                      style={{ borderRadius: '999px', padding: '12px 20px', fontSize: '13px' }}
+                    >
+                      <span>Browse Catalog</span>
+                    </a>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Clean 70% Width, Full Screen Height 3D Video Scrub (Zero Decoration) */}
-              <div className="hero-canvas-col">
+              {/* Right Column: 3D Garment Viewport with Direct Drag Rotation, Hotspot Callout & Rotation Slider Bar */}
+              <div className="hero-canvas-col" style={{ position: 'relative', cursor: 'grab' }}>
                 <canvas
                   ref={scrubCanvasRef}
                   id="heroScrubCanvas"
+                  onPointerDown={handleCanvasPointerDown}
+                  onPointerMove={handleCanvasPointerMove}
+                  onPointerUp={handleCanvasPointerUp}
+                  onPointerLeave={handleCanvasPointerUp}
                   style={{
                     position: 'absolute',
                     inset: 0,
                     width: '100%',
                     height: '100%',
                     display: 'block',
+                    touchAction: 'none',
                   }}
+                  title="Glissez horizontalement pour faire pivoter le vêtement en 360°"
                 />
+
+                {/* On-Model Hotspot Callout Card as Circled by Client */}
+                <div className="shirt-hotspot-callout">
+                  <div className="hotspot-tag">HEAVYWEIGHT BLANK</div>
+                  <div className="hotspot-title">240 GSM Oversized Cut</div>
+                  <div className="hotspot-desc">
+                    Calibrated 30&times;26cm hardware print zone with reinforced collar ribbing.
+                  </div>
+                  <Link href="/studio" className="hotspot-btn">
+                    <span>Customize in Studio</span>
+                    <ArrowRight size={12} />
+                  </Link>
+                </div>
+
+                {/* Direct 360° Rotation Control Deck ("Contrôle rotation") as Sketched by Client */}
+                <div className="rotation-control-deck">
+                  <div className="rotation-header">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Rotate3d size={14} color="var(--blue)" />
+                      <span>Contr&ocirc;le Rotation &middot; 360&deg;</span>
+                    </span>
+                    <span className="rotation-angle-badge">{rotationAngle}&deg;</span>
+                  </div>
+
+                  <div className="rotation-slider-wrap">
+                    <span style={{ fontSize: '11px', color: 'var(--ink-soft)', fontWeight: 600 }}>0&deg;</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="360"
+                      value={rotationAngle}
+                      onChange={(e) => handleSliderChange(parseInt(e.target.value, 10))}
+                      className="rotation-slider"
+                      aria-label="Contrôle de rotation du vêtement"
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--ink-soft)', fontWeight: 600 }}>360&deg;</span>
+                  </div>
+
+                  <div className="rotation-presets-row">
+                    {[
+                      { label: '0° Front', angle: 0 },
+                      { label: '90° Drape', angle: 90 },
+                      { label: '180° Profile', angle: 180 },
+                      { label: '270° Back', angle: 270 },
+                    ].map((preset) => (
+                      <button
+                        key={preset.angle}
+                        type="button"
+                        className={`rotation-preset-btn ${rotationAngle === preset.angle ? 'active' : ''}`}
+                        onClick={() => handleSliderChange(preset.angle)}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         </div>
 
-        {/* ================= 1. STATS METRICS BAR ================= */}
+        {/* ================= 1. TRUST BADGES ROW (SHIPPING, PACKAGING, QUALITY) ================= */}
+        <section className="scroll-reveal-section trust-badges-wrap wrap">
+          <div className="trust-badges-grid">
+            <div className="trust-badge-card stagger-item" style={{ '--item-idx': 0 } as React.CSSProperties}>
+              <div className="trust-badge-icon">
+                <Truck size={24} />
+              </div>
+              <div>
+                <div className="trust-badge-title">Express Shipping</div>
+                <div className="trust-badge-desc">
+                  Fast, secure global dispatch with live press tracking &amp; customs pre-cleared.
+                </div>
+              </div>
+            </div>
+
+            <div className="trust-badge-card stagger-item" style={{ '--item-idx': 1 } as React.CSSProperties}>
+              <div className="trust-badge-icon">
+                <Package size={24} />
+              </div>
+              <div>
+                <div className="trust-badge-title">Custom Packaging</div>
+                <div className="trust-badge-desc">
+                  Premium rigid presentation boxes with individual protective garment polybags.
+                </div>
+              </div>
+            </div>
+
+            <div className="trust-badge-card stagger-item" style={{ '--item-idx': 2 } as React.CSSProperties}>
+              <div className="trust-badge-icon">
+                <ShieldCheck size={24} />
+              </div>
+              <div>
+                <div className="trust-badge-title">Satisfaction Guaranteed</div>
+                <div className="trust-badge-desc">
+                  Sub-millimeter print registration. What you design is what gets printed.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 2. GARMENT ANATOMY & QUALITY SPECS SECTION ================= */}
+        <section className="scroll-reveal-section specs-section wrap" id="specs">
+          <div className="section-head" style={{ marginBottom: '32px' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--blue)', fontWeight: 700, letterSpacing: '.08em', marginBottom: '6px' }}>
+                TECHNICAL CRAFTSMANSHIP
+              </div>
+              <h2 style={{ fontSize: 'clamp(28px, 3.5vw, 40px)', color: 'var(--ink)' }}>
+                Garment Anatomy &amp; Specs
+              </h2>
+            </div>
+            <p style={{ color: 'var(--ink-soft)', maxWidth: '420px' }}>
+              Precision-crafted heavyweight blanks built to withstand high-temp industrial curing and repeated wash cycles.
+            </p>
+          </div>
+
+          <div className="specs-split-grid">
+            {/* Left Blueprint Card */}
+            <div className="specs-blueprint-card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--blue)', letterSpacing: '.06em' }}>
+                  ARCHETYPE: 240 GSM TEE
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--ink-soft)' }}>
+                  CAD SEAM MAP
+                </span>
+              </div>
+
+              {/* Blueprint vector drawing */}
+              <div style={{ position: 'relative', width: '100%', height: '280px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <svg
+                  viewBox="0 0 508 508"
+                  style={{ maxHeight: '100%', maxWidth: '280px', filter: 'drop-shadow(0 6px 12px rgba(101,146,197,0.18))' }}
+                >
+                  <path
+                    d={SHIRT_PATH_D}
+                    fill="rgba(101, 146, 197, 0.08)"
+                    stroke="var(--blue)"
+                    strokeWidth="2.5"
+                  />
+                  {/* Print Zone Dashed Box */}
+                  <rect
+                    x="179"
+                    y="132"
+                    width="150"
+                    height="132"
+                    fill="rgba(36, 44, 71, 0.05)"
+                    stroke="var(--ink)"
+                    strokeWidth="1.5"
+                    strokeDasharray="4 3"
+                    rx="4"
+                  />
+                </svg>
+
+                {/* Callout Pins */}
+                <div style={{ position: 'absolute', top: '24px', right: '18px', background: 'rgba(255,255,255,0.95)', border: '1.5px solid var(--blue)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: 700, color: 'var(--ink)', boxShadow: '0 4px 12px rgba(36, 44, 71, 0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)' }} />
+                  <span>Oversize Cut &middot; Drop Shoulder</span>
+                </div>
+                <div style={{ position: 'absolute', bottom: '24px', left: '18px', background: 'rgba(255,255,255,0.95)', border: '1.5px solid var(--blue)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: 700, color: 'var(--ink)', boxShadow: '0 4px 12px rgba(36, 44, 71, 0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)' }} />
+                  <span>240 GSM Heavyweight Jersey</span>
+                </div>
+                <div style={{ position: 'absolute', top: '48%', left: '10px', background: 'rgba(255,255,255,0.95)', border: '1.5px solid var(--blue)', borderRadius: '8px', padding: '6px 12px', fontSize: '11.5px', fontWeight: 700, color: 'var(--ink)', boxShadow: '0 4px 12px rgba(36, 44, 71, 0.1)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--blue)' }} />
+                  <span>Reinforced Twin-Needle Seams</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11.5px', color: 'var(--ink-soft)', borderTop: '1px solid var(--line)', paddingTop: '12px' }}>
+                <span>Cut: Pre-shrunk Streetwear Fit</span>
+                <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Calibrated 300 &times; 260 mm Platen Zone</span>
+              </div>
+            </div>
+
+            {/* Right Quality Card as Underlined by Client */}
+            <div className="specs-quality-card">
+              <h3 className="specs-quality-title">Quality</h3>
+              <p style={{ fontSize: '13px', color: 'var(--ink-soft)', lineHeight: 1.5, margin: 0 }}>
+                Each garment is strictly benchmarked for ink adherence, dimensional stability, and luxury hand-feel.
+              </p>
+
+              <div className="specs-quality-list">
+                <div className="specs-quality-item">
+                  <Check size={16} color="var(--blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong>100% Combed Organic Ringspun Cotton:</strong> Long-staple fibers combed for zero impurities and silk-like hand-feel.
+                  </div>
+                </div>
+                <div className="specs-quality-item">
+                  <Check size={16} color="var(--blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong>240 GSM (7.1 oz/yd²) Heavyweight Gauge:</strong> Substantial streetwear drape that retains structural form wash after wash.
+                  </div>
+                </div>
+                <div className="specs-quality-item">
+                  <Check size={16} color="var(--blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong>Pre-Shrunk Compacted Finish:</strong> Under 0.8% dimensional shrinkage, guaranteeing true-to-size stability.
+                  </div>
+                </div>
+                <div className="specs-quality-item">
+                  <Check size={16} color="var(--blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong>Ultra-Dense Smooth Print Face:</strong> Enzyme biowashed to eliminate surface fuzz for high-fidelity DTG &amp; Screen prints.
+                  </div>
+                </div>
+                <div className="specs-quality-item">
+                  <Check size={16} color="var(--blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <strong>Double-Needle Reinforced Hem &amp; Cuffs:</strong> 1x1 ribbed collar with internal herringbone neck tape.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 3. VISUAL EXPLAINER (COMMENT ÇA FONCTIONNE EN IMAGE) ================= */}
+        <section className="scroll-reveal-section wrap">
+          <div className="explainer-container">
+            <div className="explainer-header">
+              <h2 className="explainer-title">Comment &ccedil;a fonctionne</h2>
+              <div className="explainer-subtitle">Explication comment &ccedil;a fonctionne en image &middot; 3 &eacute;tapes</div>
+            </div>
+
+            {/* Step Slide Content */}
+            <div className="explainer-step-card">
+              <div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(101,146,197,0.14)', padding: '4px 12px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, color: 'var(--blue)', marginBottom: '12px' }}>
+                  &Eacute;TAPE 0{EXPLAINER_STEPS[activeExplainerStep].step}
+                </div>
+                <h3 style={{ fontSize: '24px', fontFamily: 'var(--font-title)', color: 'var(--ink)', marginBottom: '10px' }}>
+                  {EXPLAINER_STEPS[activeExplainerStep].title}
+                </h3>
+                <p style={{ fontSize: '14px', color: 'var(--ink-soft)', lineHeight: 1.6, marginBottom: '24px' }}>
+                  {EXPLAINER_STEPS[activeExplainerStep].desc}
+                </p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveExplainerStep((prev) => (prev > 0 ? prev - 1 : 2))}
+                    className="btn btn-secondary small"
+                  >
+                    &larr; Pr&eacute;c&eacute;dent
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveExplainerStep((prev) => (prev < 2 ? prev + 1 : 0))}
+                    className="btn btn-primary small"
+                  >
+                    Suivant &rarr;
+                  </button>
+                </div>
+              </div>
+
+              {/* Visual Step Illustration */}
+              <div style={{ background: '#FFFFFF', borderRadius: '12px', padding: '24px', border: '1.5px solid rgba(101,146,197,0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+                {EXPLAINER_STEPS[activeExplainerStep].renderVisual()}
+              </div>
+            </div>
+
+            {/* Pagination Dots (• • •) */}
+            <div className="explainer-nav-dots" aria-label="Visual explanation steps">
+              {[0, 1, 2].map((stepIdx) => (
+                <button
+                  key={stepIdx}
+                  type="button"
+                  className={`explainer-dot ${activeExplainerStep === stepIdx ? 'active' : ''}`}
+                  onClick={() => setActiveExplainerStep(stepIdx)}
+                  aria-label={`Step ${stepIdx + 1}`}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ================= 4. STATS METRICS ("NUMBER") ================= */}
         <section
           className="scroll-reveal-section section-solid-linen"
           id="statsSection"
           style={{ color: 'var(--ink)', padding: '40px 0 48px' }}
         >
+          <div className="wrap" style={{ textAlign: 'center', marginBottom: '22px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '.14em', color: 'var(--blue)', textTransform: 'uppercase' }}>
+              Number &middot; Chiffres Cl&eacute;s
+            </span>
+          </div>
+
           <div className="wrap stats-bar-grid">
             <div className="stagger-item" style={{ '--item-idx': 0 } as React.CSSProperties}>
               <div style={{ fontFamily: 'var(--font-sans)', fontSize: '34px', fontWeight: 700, color: 'var(--ink)' }}>
@@ -594,11 +842,11 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ================= 2. MULTI-GARMENT EXTENSION SHOWCASE ================= */}
+        {/* ================= 5. GARMENT CATALOG HORIZONTAL CAROUSEL ================= */}
         <section
           className="scroll-reveal-section section-solid-linen"
           id="garments"
-          style={{ color: 'var(--ink)', padding: '80px 0 88px' }}
+          style={{ color: 'var(--ink)', padding: '72px 0 88px' }}
         >
           <div className="wrap">
             <div className="section-head">
@@ -640,7 +888,7 @@ export default function LandingPage() {
                 background: 'rgba(101, 146, 197, 0.12)',
                 padding: '4px',
                 borderRadius: '999px',
-                marginBottom: '36px',
+                marginBottom: '32px',
               }}
             >
               {(['tops', 'bottoms', 'outerwear'] as const).map((cat) => (
@@ -665,148 +913,182 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* Multi-Garment Grid */}
-            <div className="grid">
-              {categoryModels.map((model, idx) => {
-                const activeColor = cardColors[model.id] || '#F6F4EE';
-                return (
-                  <div
-                    key={model.id}
-                    className="card stagger-item"
-                    style={{
-                      '--item-idx': idx,
-                      background: '#FFFFFF',
-                      border: '1.5px solid rgba(101, 146, 197, 0.28)',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      boxShadow: '0 12px 32px -8px rgba(36, 44, 71, 0.08)',
-                    } as React.CSSProperties}
-                  >
-                    <div
-                      className="swatch"
-                      style={{
-                        background: activeColor === '#1B1C1E' ? '#222429' : activeColor === '#00AEEF' ? 'rgba(0, 174, 239, 0.12)' : activeColor === '#DD0072' ? 'rgba(221, 0, 114, 0.12)' : 'rgba(232, 228, 218, 0.7)',
-                        transition: 'background 0.3s ease',
-                      }}
-                    >
+            {/* Horizontal Garment Carousel as Requested by Client with ◀ / ▶ Arrows */}
+            <div className="carousel-wrapper">
+              <button
+                type="button"
+                className="carousel-arrow-btn prev"
+                onClick={() => scrollCarousel('left')}
+                aria-label="Previous garments"
+              >
+                <ChevronLeft size={22} />
+              </button>
+
+              <div className="carousel-track" ref={carouselTrackRef}>
+                {categoryModels.map((model, idx) => {
+                  const activeColor = cardColors[model.id] || '#F6F4EE';
+                  const pathD = model.id.includes('hoodie')
+                    ? HOODIE_PATH_D
+                    : model.id.includes('pants') || model.id.includes('shorts')
+                    ? PANTS_PATH_D
+                    : model.id.includes('jacket') || model.id.includes('windbreaker')
+                    ? JACKET_PATH_D
+                    : SHIRT_PATH_D;
+
+                  return (
+                    <div key={model.id} className="carousel-card">
                       <div
+                        className="swatch"
                         style={{
+                          background:
+                            activeColor === '#1B1C1E'
+                              ? '#222429'
+                              : activeColor === '#00AEEF'
+                              ? 'rgba(0, 174, 239, 0.12)'
+                              : activeColor === '#DD0072'
+                              ? 'rgba(221, 0, 114, 0.12)'
+                              : 'rgba(232, 228, 218, 0.7)',
+                          transition: 'background 0.3s ease',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: '8px',
+                          position: 'relative',
+                          padding: '24px 0',
+                          minHeight: '190px',
                         }}
                       >
-                        <Box size={54} color="#6592C5" />
-                        <span
+                        {/* Real SVG Garment Silhouette Blueprint Replacing Generic Cube */}
+                        <svg
+                          viewBox="0 0 512 512"
                           style={{
-                            fontSize: '11px',
-                            color: activeColor === '#1B1C1E' ? '#E8E4DA' : 'var(--ink-soft)',
-                            fontFamily: 'var(--font-sans)',
+                            width: '92px',
+                            height: '92px',
+                            filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.12))',
+                            transition: 'transform 0.3s ease',
+                          }}
+                        >
+                          <path
+                            d={pathD}
+                            fill={activeColor}
+                            stroke={activeColor === '#1B1C1E' ? '#4A5568' : '#6592C5'}
+                            strokeWidth="3"
+                          />
+                        </svg>
+
+                        <div
+                          className="material-badge"
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            background: 'rgba(240,238,230,.94)',
+                            borderColor: 'var(--blue)',
+                            color: 'var(--ink)',
+                            fontSize: '10px',
+                            padding: '3px 8px',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: '6px',
+                              height: '6px',
+                              borderRadius: '50%',
+                              backgroundColor: 'var(--blue)',
+                              display: 'inline-block',
+                            }}
+                          />
+                          {model.tier.toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div className="body" style={{ borderColor: 'var(--line)', padding: '18px 20px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <div className="name" style={{ color: 'var(--ink)', margin: 0, fontSize: '16px', fontWeight: 700 }}>
+                            {model.name}
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '13.5px',
+                              fontWeight: 700,
+                              color: 'var(--blue)',
+                            }}
+                          >
+                            ${model.blankPrice.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="price" style={{ color: 'var(--ink-soft)', marginBottom: '14px', fontSize: '12.5px' }}>
+                          {model.printZone.name} &middot; Calibrated Platen
+                        </div>
+
+                        {/* Interactive Color Swatches */}
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--ink-soft)', marginBottom: '6px' }}>
+                            Couleurs disponibles :
+                          </div>
+                          <div className="card-color-swatches" aria-label="Select fabric color" style={{ margin: 0 }}>
+                            {SWATCHES.map((swatch) => (
+                              <button
+                                key={swatch.id}
+                                type="button"
+                                className={`card-swatch-btn ${activeColor === swatch.hex ? 'active' : ''}`}
+                                style={{ backgroundColor: swatch.hex }}
+                                title={swatch.name}
+                                onClick={() =>
+                                  setCardColors((prev) => ({ ...prev, [model.id]: swatch.hex }))
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        <Link
+                          href={`/studio?model=${model.id}&color=${encodeURIComponent(activeColor)}`}
+                          className="btn small btn-magnetic"
+                          style={{
+                            width: '100%',
+                            borderRadius: '8px',
+                            background: 'var(--ink)',
+                            color: 'var(--paper)',
+                            display: 'flex',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '10px 0',
+                            fontSize: '13px',
                             fontWeight: 600,
                           }}
                         >
-                          {model.printZone.name}
-                        </span>
-                      </div>
-                      <div
-                        className="material-badge"
-                        style={{
-                          background: 'rgba(240,238,230,.94)',
-                          borderColor: 'var(--blue)',
-                          color: 'var(--ink)',
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: '6px',
-                            height: '6px',
-                            borderRadius: '50%',
-                            backgroundColor: 'var(--blue)',
-                            display: 'inline-block',
-                          }}
-                        />
-                        {model.tier.toUpperCase()}
+                          <span>Customize in 3D Studio</span>
+                          <ChevronRight size={14} />
+                        </Link>
                       </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="body" style={{ borderColor: 'var(--line)', padding: '20px' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        <div className="name" style={{ color: 'var(--ink)', margin: 0, fontSize: '17px', fontWeight: 600 }}>
-                          {model.name}
-                        </div>
-                        <span
-                          style={{
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            color: 'var(--blue)',
-                          }}
-                        >
-                          ${model.blankPrice.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="price" style={{ color: 'var(--ink-soft)', marginBottom: '14px', fontSize: '13px' }}>
-                        {model.description}
-                      </div>
-
-                      {/* Interactive Color Swatches */}
-                      <div style={{ marginBottom: '14px' }}>
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--ink-soft)', marginBottom: '6px' }}>
-                          Available Blank Colors:
-                        </div>
-                        <div className="card-color-swatches" aria-label="Select fabric color" style={{ margin: 0 }}>
-                          {SWATCHES.map((swatch) => (
-                            <button
-                              key={swatch.id}
-                              type="button"
-                              className={`card-swatch-btn ${activeColor === swatch.hex ? 'active' : ''}`}
-                              style={{ backgroundColor: swatch.hex }}
-                              title={swatch.name}
-                              onClick={() =>
-                                setCardColors((prev) => ({ ...prev, [model.id]: swatch.hex }))
-                              }
-                            />
-                          ))}
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/studio?model=${model.id}&color=${encodeURIComponent(activeColor)}`}
-                        className="btn small btn-magnetic"
-                        style={{
-                          width: '100%',
-                          borderRadius: '8px',
-                          background: 'var(--ink)',
-                          color: 'var(--paper)',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '10px 0',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                        }}
-                      >
-                        <span>Customize in 3D Studio</span>
-                        <ChevronRight size={14} />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
+              <button
+                type="button"
+                className="carousel-arrow-btn next"
+                onClick={() => scrollCarousel('right')}
+                aria-label="Next garments"
+              >
+                <ChevronRight size={22} />
+              </button>
             </div>
           </div>
         </section>
 
-        {/* ================= 3. 3D MODELS ECOSYSTEM (DEEP MIDNIGHT SLATE) ================= */}
+        {/* ================= 6. 3D ASSET INFRASTRUCTURE (DEEP MIDNIGHT SLATE) ================= */}
         <section
           className="scroll-reveal-section section-dark-midnight"
           id="ecosystem"
@@ -840,7 +1122,7 @@ export default function LandingPage() {
                 </h2>
               </div>
               <p style={{ color: '#A0AEC0', maxWidth: '380px' }}>
-                Pick from production-standard blanks, community streetwear meshes, or commercial pro CAD master files.
+                Production-standard blanks, creator streetwear meshes, and commercial master files.
               </p>
             </div>
 
@@ -1075,7 +1357,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ================= 4. GARMENT SCRUTINY SECTION (DEEP MIDNIGHT SLATE) ================= */}
+        {/* ================= 7. GARMENT SCRUTINY SECTION ================= */}
         <section
           className="scroll-reveal-section section-dark-midnight"
           id="scrutinySection"
@@ -1167,7 +1449,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ================= 5. METHODOLOGY WORKFLOW ================= */}
+        {/* ================= 8. METHODOLOGY WORKFLOW ("PRINT LIKE YOU IMAGINE") ================= */}
         <section
           className="scroll-reveal-section section-solid-linen"
           id="workflowSection"
@@ -1196,12 +1478,13 @@ export default function LandingPage() {
                     letterSpacing: '0.01em',
                   }}
                 >
-                  From 3D digital proof to physical press
+                  Print like you imagine
                 </h2>
               </div>
-              <p style={{ color: 'var(--ink-soft)' }}>
-                Four precision steps that eliminate printing errors before production.
-              </p>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: '#10B981', fontSize: '13px', fontWeight: 700 }}>
+                <CheckCircle2 size={18} color="#10B981" />
+                <span>Validated 3D Proofing Pipeline</span>
+              </div>
             </div>
             <div className="steps">
               <div
@@ -1267,7 +1550,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ================= 6. EDITORIAL STORY BANNER WITH "TRY IT" CTA ================= */}
+        {/* ================= 9. EDITORIAL STORY BANNER WITH WHATSAPP INTEGRATION ================= */}
         <section
           className="scroll-reveal-section"
           id="storyBannerSection"
@@ -1324,10 +1607,10 @@ export default function LandingPage() {
                 marginBottom: '32px',
               }}
             >
-              Over 12,000 garment runs proofed without a single misprint. No credit card, registration, or software download required.
+              Over 12,000 garment runs proofed without a single misprint. Contact us directly or launch the 3D Studio workstation.
             </p>
 
-            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
               <Link
                 href="/studio"
                 className="btn btn-primary"
@@ -1345,6 +1628,18 @@ export default function LandingPage() {
                 <span>Launch 3D Studio &mdash; Try It Now</span>
                 <ArrowRight size={16} />
               </Link>
+
+              {/* Direct WhatsApp CTA Button as Requested by Client */}
+              <a
+                href="https://wa.me/?text=Hello%20ORICAN,%20I%20would%20like%20to%20proof%20a%20garment%20design"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-whatsapp"
+                title="Discuter directement sur WhatsApp avec l'équipe ORICAN"
+              >
+                <MessageCircle size={18} />
+                <span>Contact via WhatsApp</span>
+              </a>
 
               <a
                 href="#garments"
@@ -1371,7 +1666,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ================= 7. STUDIO FOOTER ================= */}
+        {/* ================= 10. STUDIO FOOTER WITH WHATSAPP ================= */}
         <footer
           className="landing-footer"
           style={{
@@ -1383,14 +1678,14 @@ export default function LandingPage() {
             zIndex: 10,
           }}
         >
-          <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+          <div className="wrap" style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 width: '100%',
                 flexWrap: 'wrap',
-                gap: '12px',
+                gap: '16px',
                 alignItems: 'center',
               }}
             >
@@ -1411,7 +1706,18 @@ export default function LandingPage() {
                 </span>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              {/* Direct WhatsApp Channel in Footer as Requested by Client ("footer avec whatsapp + n°") */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <a
+                  href="https://wa.me/?text=Hello%20ORICAN%20Support"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="footer-whatsapp-pill"
+                >
+                  <MessageCircle size={14} color="#25D366" />
+                  <span>WhatsApp : +1 (800) ORICAN-PRO</span>
+                </a>
+
                 <Link
                   href="/studio"
                   style={{
@@ -1423,9 +1729,6 @@ export default function LandingPage() {
                 >
                   3D Studio Workstation &rarr;
                 </Link>
-                <span style={{ fontSize: '11px', color: 'var(--blue)', fontFamily: 'var(--font-sans)' }}>
-                  Direct WebGL Engine Active
-                </span>
               </div>
             </div>
 
