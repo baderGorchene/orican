@@ -1,0 +1,180 @@
+import { JACKET_PATH_D, JACKET_PATH_SIZE, PANTS_PATH_D, PANTS_PATH_SIZE } from '@/lib/constants';
+
+/**
+ * Garment catalog for the 3D configurator.
+ *
+ * Until real .glb garments exist, each garment is generated procedurally by
+ * inflating a 2D outline (SVG path, y-down "path units") into a closed 3D shell
+ * (see garment-geometry.ts). Everything here is authored in path units; the
+ * builder converts to meters using `heightM`.
+ */
+
+export type GarmentSide = 'front' | 'back';
+
+export interface Hotspot {
+  id: string;
+  label: string;
+  /** Point in path units (x right, y down). */
+  x: number;
+  y: number;
+  side: GarmentSide;
+}
+
+export interface NeckOpening {
+  /** 'crew' = scooped front neckline, 'hood' = full hood opening. */
+  type: 'crew' | 'hood';
+  cx: number;
+  cy: number;
+  rx: number;
+  ry: number;
+}
+
+export interface Garment3D {
+  id: string;
+  name: string;
+  category: 'tops' | 'bottoms' | 'outerwear';
+  outline: { d: string; w: number; h: number };
+  /** Real-world height of the outline's bounding box, in meters. */
+  heightM: number;
+  /** Max half-thickness of the front shell, in meters. */
+  depth: number;
+  /** Distance from the outline edge (meters) over which the shell reaches full depth. */
+  falloff: number;
+  /** Back shell depth as a fraction of `depth`. */
+  backScale: number;
+  neck?: NeckOpening;
+  /** Open SVG paths (path units) drawn as double-needle stitching. */
+  stitches: { front: string[]; back: string[] };
+  /** Open SVG paths (path units) drawn as seam indents. */
+  seams: { front: string[]; back: string[] };
+  hotspots: Hotspot[];
+}
+
+const TEE_PATH =
+  'M 190 40 Q 250 50 310 40 L 400 66 C 440 80 462 150 478 246 L 392 272 L 386 206 ' +
+  'C 386 300 390 420 392 500 Q 250 506 108 500 C 110 420 114 300 114 206 L 108 272 ' +
+  'L 22 246 C 38 150 60 80 100 66 L 190 40 Z';
+
+const HOODIE_PATH =
+  'M 250 8 C 318 8 352 48 350 108 L 408 126 C 446 142 468 240 482 400 L 486 468 L 434 476 ' +
+  'L 420 420 L 388 244 C 388 330 390 430 392 520 Q 250 528 108 520 C 110 430 112 330 112 244 ' +
+  'L 80 420 L 66 476 L 14 468 L 18 400 C 32 240 54 142 92 126 L 150 108 C 148 48 182 8 250 8 Z';
+
+export const GARMENTS: Garment3D[] = [
+  {
+    id: 'tee-boxy',
+    name: 'Boxy Heavyweight Tee',
+    category: 'tops',
+    outline: { d: TEE_PATH, w: 500, h: 520 },
+    heightM: 0.74,
+    depth: 0.1,
+    falloff: 0.16,
+    backScale: 0.8,
+    neck: { type: 'crew', cx: 250, cy: 42, rx: 60, ry: 40 },
+    stitches: {
+      front: ['M 116 486 Q 250 492 384 486', 'M 470 232 L 390 257', 'M 30 232 L 110 257'],
+      back: ['M 116 486 Q 250 492 384 486', 'M 470 232 L 390 257', 'M 30 232 L 110 257'],
+    },
+    seams: {
+      front: ['M 398 70 Q 394 140 388 206', 'M 102 70 Q 106 140 112 206'],
+      back: ['M 398 70 Q 394 140 388 206', 'M 102 70 Q 106 140 112 206'],
+    },
+    hotspots: [
+      { id: 'center-chest', label: 'Center Chest', x: 250, y: 170, side: 'front' },
+      { id: 'left-chest', label: 'Left Chest', x: 318, y: 140, side: 'front' },
+      { id: 'right-chest', label: 'Right Chest', x: 182, y: 140, side: 'front' },
+      { id: 'left-sleeve', label: 'Left Sleeve', x: 432, y: 180, side: 'front' },
+      { id: 'right-sleeve', label: 'Right Sleeve', x: 68, y: 180, side: 'front' },
+      { id: 'hem', label: 'Lower Hem', x: 320, y: 440, side: 'front' },
+      { id: 'upper-back', label: 'Upper Back', x: 250, y: 150, side: 'back' },
+    ],
+  },
+  {
+    id: 'hoodie-heavy',
+    name: 'Heavy Fleece Hoodie',
+    category: 'tops',
+    outline: { d: HOODIE_PATH, w: 500, h: 530 },
+    heightM: 0.8,
+    depth: 0.12,
+    falloff: 0.17,
+    backScale: 0.85,
+    neck: { type: 'hood', cx: 250, cy: 96, rx: 54, ry: 60 },
+    stitches: {
+      front: [
+        'M 110 490 Q 250 496 390 490',
+        'M 20 446 L 72 454',
+        'M 430 454 L 482 446',
+        'M 168 466 L 176 364 Q 250 354 324 364 L 332 466',
+      ],
+      back: ['M 110 490 Q 250 496 390 490', 'M 20 446 L 72 454', 'M 430 454 L 482 446'],
+    },
+    seams: {
+      front: ['M 150 112 Q 128 180 112 244', 'M 350 112 Q 372 180 388 244', 'M 196 364 L 212 466', 'M 304 364 L 288 466'],
+      back: ['M 150 112 Q 128 180 112 244', 'M 350 112 Q 372 180 388 244'],
+    },
+    hotspots: [
+      { id: 'center-chest', label: 'Center Chest', x: 250, y: 240, side: 'front' },
+      { id: 'left-chest', label: 'Left Chest', x: 322, y: 210, side: 'front' },
+      { id: 'right-chest', label: 'Right Chest', x: 178, y: 210, side: 'front' },
+      { id: 'pocket', label: 'Kangaroo Pocket', x: 250, y: 412, side: 'front' },
+      { id: 'left-sleeve', label: 'Left Sleeve', x: 446, y: 300, side: 'front' },
+      { id: 'upper-back', label: 'Upper Back', x: 250, y: 230, side: 'back' },
+    ],
+  },
+  {
+    id: 'jacket-work',
+    name: 'Canvas Work Jacket',
+    category: 'outerwear',
+    outline: { d: JACKET_PATH_D, w: JACKET_PATH_SIZE.w, h: JACKET_PATH_SIZE.h },
+    heightM: 0.78,
+    depth: 0.12,
+    falloff: 0.16,
+    backScale: 0.85,
+    neck: { type: 'crew', cx: 258, cy: 34, rx: 66, ry: 34 },
+    stitches: {
+      front: ['M 170 150 L 234 150 L 234 222 L 170 222 Z', 'M 282 150 L 346 150 L 346 222 L 282 222 Z', 'M 70 492 L 450 492'],
+      back: ['M 70 492 L 450 492'],
+    },
+    seams: {
+      front: ['M 258 72 L 258 506', 'M 166 140 L 238 140', 'M 278 140 L 350 140'],
+      back: ['M 258 72 L 258 506'],
+    },
+    hotspots: [
+      { id: 'left-chest', label: 'Left Chest Pocket', x: 314, y: 186, side: 'front' },
+      { id: 'right-chest', label: 'Right Chest Pocket', x: 202, y: 186, side: 'front' },
+      { id: 'collar', label: 'Collar Welt', x: 258, y: 90, side: 'front' },
+      { id: 'lower-front', label: 'Lower Front', x: 330, y: 400, side: 'front' },
+      { id: 'upper-back', label: 'Upper Back', x: 258, y: 190, side: 'back' },
+    ],
+  },
+  {
+    id: 'pants-fleece',
+    name: 'Relaxed Fleece Pants',
+    category: 'bottoms',
+    outline: { d: PANTS_PATH_D, w: PANTS_PATH_SIZE.w, h: PANTS_PATH_SIZE.h },
+    heightM: 1.02,
+    depth: 0.075,
+    falloff: 0.09,
+    backScale: 0.9,
+    stitches: {
+      front: ['M 112 40 L 296 40'],
+      back: ['M 112 40 L 296 40'],
+    },
+    seams: {
+      front: ['M 204 44 L 204 200'],
+      back: ['M 204 44 L 204 200'],
+    },
+    hotspots: [
+      { id: 'left-thigh', label: 'Left Thigh', x: 272, y: 210, side: 'front' },
+      { id: 'right-thigh', label: 'Right Thigh', x: 132, y: 210, side: 'front' },
+      { id: 'waist', label: 'Front Waist', x: 250, y: 80, side: 'front' },
+      { id: 'back-pocket', label: 'Back Pocket', x: 272, y: 120, side: 'back' },
+    ],
+  },
+];
+
+export const DEFAULT_GARMENT_ID = GARMENTS[0].id;
+
+export function getGarment(id: string): Garment3D {
+  return GARMENTS.find((g) => g.id === id) ?? GARMENTS[0];
+}
