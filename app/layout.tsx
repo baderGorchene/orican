@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import LenisProvider from '@/components/LenisProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -33,9 +32,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <LenisProvider>
-          {children}
-        </LenisProvider>
+        {children}
         <Script
           src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"
           strategy="beforeInteractive"
