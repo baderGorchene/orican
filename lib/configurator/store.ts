@@ -12,6 +12,8 @@ export interface BaseItem {
 }
 
 export type PrintFinish = 'dtg' | 'screen' | 'puff' | 'foil' | 'vinyl';
+/** How a 3D model is turned into artwork: flat graphic colors, or a shaded render. */
+export type PrintStyle = 'graphic' | 'shaded';
 
 /** A printed artwork projected onto the fabric. */
 export interface DesignItem extends BaseItem {
@@ -21,7 +23,13 @@ export interface DesignItem extends BaseItem {
   aspect: number;
   finish: PrintFinish;
   /** Set when the print was baked from a 3D attachment, so it can go back to 3D editing. */
-  baked?: Pick<AccessoryItem, 'assetKey' | 'name' | 'placement' | 'transform' | 'filters'>;
+  baked?: Pick<AccessoryItem, 'assetKey' | 'name' | 'placement' | 'transform' | 'filters'> & {
+    style: PrintStyle;
+    /** Print center relative to the model's anchor, in the yawed surface frame (meters). */
+    anchorOffset: [number, number];
+    /** Print width (meters) right after baking; later resizing scales the model on "Edit as 3D". */
+    printWidth: number;
+  };
 }
 
 /** A rigid 3D attachment (hardware or upload). */

@@ -207,15 +207,40 @@ function applyMaterialMode(material: THREE.Material, mode: MaterialMode) {
  * installs the grading shader. Grading values are uniforms, so later filter
  * changes go through `updateFilterUniforms` without recompiling.
  */
-export function makeFilteredObject(source: THREE.Object3D, filters: ModelFilters): THREE.Object3D {
+/** Diffuse-only copy of a material: keeps colors and textures, drops highlights and reflections. */
+function flatMaterial(mat: THREE.Material, mode: MaterialMode): THREE.Material {
+  const src = mat as THREE.MeshStandardMaterial;
+  const c = new THREE.MeshLambertMaterial({
+    color: src.color ? src.color.clone() : new THREE.Color('#ffffff'),
+    map: src.map ?? null,
+    vertexColors: src.vertexColors,
+    transparent: src.transparent,
+    opacity: src.opacity,
+    alphaTest: src.alphaTest,
+    side: src.side,
+  });
+  if (mode === 'gold') c.color.set('#e7b95e');
+  if (mode === 'chrome') c.color.set('#d9dde3');
+  return c;
+}
+
+export function makeFilteredObject(
+  source: THREE.Object3D,
+  filters: ModelFilters,
+  opts: { flat?: boolean } = {},
+): THREE.Object3D {
   const copy = source.clone(true);
   const uniforms = makeUniforms();
   copy.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
     const clone = (mat: THREE.Material) => {
-      const c = mat.clone();
-      applyMaterialMode(c, filters.material);
+      let c: THREE.Material;
+      if (opts.flat) c = flatMaterial(mat, filters.material);
+      else {
+        c = mat.clone();
+        applyMaterialMode(c, filters.material);
+      }
       patchMaterial(c, uniforms);
       return c;
     };

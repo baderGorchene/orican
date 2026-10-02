@@ -13,7 +13,7 @@ import { sceneRefs } from '@/lib/configurator/scene-refs';
 import { useStudio } from '@/lib/configurator/store';
 import { CameraRig } from './CameraRig';
 import { GarmentMesh } from './GarmentMesh';
-import { AccessoryNode, DesignDecal } from './items';
+import { AccessoryNode } from './items';
 import { PlacementGhost } from './PlacementGhost';
 import { TransformGizmo } from './TransformGizmo';
 
@@ -124,9 +124,8 @@ export function StudioScene() {
       <group ref={root}>
         {loaded && build && (
           <>
-            <GarmentMesh garment={loaded.garment} build={build}>
-              {items.map((item) => (item.kind === 'design' ? <DesignDecal key={item.id} item={item} build={build} /> : null))}
-            </GarmentMesh>
+            {/* Prints are part of the garment material (see print-layer.ts), not separate meshes. */}
+            <GarmentMesh garment={loaded.garment} build={build} />
             {items.map((item) => (item.kind === 'accessory' ? <AccessoryNode key={item.id} item={item} build={build} /> : null))}
             <PlacementGhost build={build} />
             {selected && selected.visible && !selected.locked && !recording && !placing && (

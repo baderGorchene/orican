@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { paintBackground } from './backgrounds';
+import { buildDecalGeometry } from './decal';
+import { FINISHES } from './print-layer';
+import { peekPrintTexture } from './print-textures';
 import { NO_EXPORT, sceneRefs } from './scene-refs';
 import { useStudio } from './store';
 
@@ -50,11 +53,43 @@ export function exportPNG() {
   download(out.toDataURL('image/png'), `${baseName()}_render.png`);
 }
 
+/**
+ * Prints live inside the garment shader, which glTF can't carry; for export
+ * they become real decal meshes with standard materials, removed afterwards.
+ */
+function addExportDecals(root: THREE.Group): THREE.Mesh[] {
+  const build = sceneRefs.garment;
+  if (!build) return [];
+  const meshes: THREE.Mesh[] = [];
+  for (const item of useStudio.getState().items) {
+    if (item.kind !== 'design' || !item.visible) continue;
+    const texture = peekPrintTexture(item.src);
+    if (!texture) continue;
+    const f = FINISHES[item.finish ?? 'dtg'];
+    const mesh = new THREE.Mesh(
+      buildDecalGeometry(build, item.placement, item.aspect),
+      new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: true,
+        roughness: f.roughness,
+        metalness: f.metalness,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+      }),
+    );
+    mesh.name = `Print: ${item.name}`;
+    root.add(mesh);
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
 export async function exportGLB() {
   const { root } = sceneRefs;
   if (!root) throw new Error('Viewport not ready');
   const rotation = root.rotation.y;
   root.rotation.y = 0;
+  const decals = addExportDecals(root);
   root.updateMatrixWorld(true);
   try {
     const result = await withHelpersHidden(() =>
@@ -66,6 +101,11 @@ export async function exportGLB() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   } finally {
     root.rotation.y = rotation;
+    for (const d of decals) {
+      root.remove(d);
+      d.geometry.dispose();
+      (d.material as THREE.Material).dispose();
+    }
   }
 }
 

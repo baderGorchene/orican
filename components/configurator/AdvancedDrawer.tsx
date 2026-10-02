@@ -17,7 +17,7 @@ import {
   Unlock,
   X,
 } from 'lucide-react';
-import { editPrintAs3D, printAccessory } from '@/lib/configurator/bake';
+import { editPrintAs3D, printAccessory, restylePrint } from '@/lib/configurator/bake';
 import { getGarment } from '@/lib/configurator/garments';
 import {
   DEFAULT_FILTERS,
@@ -36,6 +36,7 @@ import {
   DESIGN_SCALE_RANGE,
   DesignItem,
   PrintFinish,
+  PrintStyle,
   StudioItem,
   ViewMode,
   useStudio,
@@ -55,6 +56,11 @@ const FINISHES: { id: PrintFinish; label: string; hint: string }[] = [
   { id: 'puff', label: 'Puff', hint: 'Raised, rubbery print' },
   { id: 'foil', label: 'Foil', hint: 'Metallic transfer' },
   { id: 'vinyl', label: 'Vinyl', hint: 'Smooth glossy heat transfer' },
+];
+
+const PRINT_STYLES: { id: PrintStyle; label: string; hint: string }[] = [
+  { id: 'graphic', label: 'Graphic', hint: 'Flat artwork colors, like a printed illustration' },
+  { id: 'shaded', label: 'Shaded', hint: 'Keeps the 3D lighting, like a printed photo of the model' },
 ];
 
 const NUDGE_STEPS = [
@@ -462,6 +468,29 @@ function PrintInspector({ item }: { item: DesignItem }) {
       <p className={styles.hint} style={{ marginTop: 6 }}>
         {FINISHES.find((f) => f.id === (item.finish ?? 'dtg'))?.hint}
       </p>
+
+      {item.baked && (
+        <>
+          <div className={styles.sliderHead}>
+            <span>Print style</span>
+          </div>
+          <div className={styles.chips}>
+            {PRINT_STYLES.map((st) => (
+              <button
+                key={st.id}
+                title={st.hint}
+                className={`${styles.chip} ${item.baked!.style === st.id ? styles.chipActive : ''}`}
+                onClick={() => item.baked!.style !== st.id && restylePrint(item.id, st.id)}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+          <p className={styles.hint} style={{ marginTop: 6 }}>
+            {PRINT_STYLES.find((st) => st.id === item.baked!.style)?.hint}
+          </p>
+        </>
+      )}
 
       <div className={styles.sliderHead}>
         <span>Slide along the fabric (or drag it)</span>

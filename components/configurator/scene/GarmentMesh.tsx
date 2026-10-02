@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
 import { getAsset } from '@/lib/configurator/assets';
@@ -8,18 +8,51 @@ import { getRibNormalMap, makeFabricMaterial, makeGarmentNormalMap, makeKnitNorm
 import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
 import type { Garment3D } from '@/lib/configurator/garments';
 import { interaction } from '@/lib/configurator/placement';
+import { PrintInput, PrintLayer, printAtPoint } from '@/lib/configurator/print-layer';
+import { requestPrintTexture, retainPrintTextures } from '@/lib/configurator/print-textures';
 import { sceneRefs } from '@/lib/configurator/scene-refs';
 import { DEFAULT_FILTERS, DEFAULT_TRANSFORM } from '@/lib/configurator/model-edit';
-import { DEFAULT_CLEARANCE, newId, useStudio } from '@/lib/configurator/store';
+import { DEFAULT_CLEARANCE, DesignItem, newId, useStudio } from '@/lib/configurator/store';
 import { interpolatedNormal, toVec3 } from '@/lib/configurator/surface';
 
 const noRaycast = () => null;
 const WHITE = new THREE.Color('#ffffff');
 
 export const clayMaterial = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0 });
-// Procedural garments carry baked edge occlusion in vertex colors; model garments render double-sided.
-const clayProcedural = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0, vertexColors: true });
-const clayModel = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0, side: THREE.DoubleSide });
+
+/** Prints are projected inside the garment material, so they need the garment's own hit point to be picked. */
+function useGarmentPrints(materials: THREE.MeshStandardMaterial[]) {
+  const items = useStudio((s) => s.items);
+  const designs = useMemo(() => items.filter((i): i is DesignItem => i.kind === 'design'), [items]);
+  const layer = useMemo(() => new PrintLayer(), []);
+  const [loadedVersion, setLoadedVersion] = useState(0);
+
+  useEffect(() => {
+    materials.forEach((m) => layer.attach(m));
+    return () => materials.forEach((m) => layer.detach(m));
+  }, [layer, materials]);
+
+  useEffect(() => {
+    const inputs: PrintInput[] = [];
+    for (const item of designs) {
+      const texture = requestPrintTexture(item.src, () => setLoadedVersion((v) => v + 1));
+      if (texture) inputs.push({ item, texture });
+    }
+    layer.update(inputs);
+  }, [layer, designs, loadedVersion]);
+
+  // Free artwork no longer used by any print (undo history keeps srcs alive via the snapshots it restores).
+  useEffect(() => {
+    const keep = new Set<string>();
+    const { past, future } = useStudio.getState();
+    for (const snap of [{ items }, ...past, ...future]) {
+      for (const i of snap.items) if (i.kind === 'design') keep.add(i.src);
+    }
+    retainPrintTextures(keep);
+  }, [items]);
+
+  return designs;
+}
 
 interface Props {
   garment: Garment3D;
@@ -42,7 +75,20 @@ export function GarmentMesh({ garment, build, children }: Props) {
         : makeFabricMaterial('#ffffff', normalMap),
     [garment, normalMap],
   );
-  const clayBody = garment.source === 'model' ? clayModel : clayProcedural;
+  // Procedural garments carry baked edge occlusion in vertex colors; model garments render double-sided.
+  const clayBody = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: '#d9d9d9',
+        roughness: 0.75,
+        metalness: 0,
+        vertexColors: garment.source === 'procedural',
+        side: garment.source === 'model' ? THREE.DoubleSide : THREE.FrontSide,
+      }),
+    [garment],
+  );
+  const printMaterials = useMemo(() => [fabric, clayBody], [fabric, clayBody]);
+  const designs = useGarmentPrints(printMaterials);
   const collarFabric = useMemo(() => {
     const m = makeFabricMaterial('#ffffff', getRibNormalMap());
     m.vertexColors = false;
@@ -53,7 +99,8 @@ export function GarmentMesh({ garment, build, children }: Props) {
   useEffect(() => () => {
     normalMap.dispose();
     fabric.dispose();
-  }, [normalMap, fabric]);
+    clayBody.dispose();
+  }, [normalMap, fabric, clayBody]);
 
   useEffect(() => {
     fabric.color.set(color);
@@ -70,7 +117,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
 
   const updateHover = (e: ThreeEvent<PointerEvent>) => {
     const root = sceneRefs.root;
-    // Events bubble up from child decals; always use the garment's own intersection.
+    // Events can bubble up from children; always use the garment's own intersection.
     const hit = e.object === bodyRef.current ? e : e.intersections.find((i) => i.object === bodyRef.current);
     if (!root || !hit?.face) {
       interaction.hover.valid = false;
@@ -83,8 +130,24 @@ export function GarmentMesh({ garment, build, children }: Props) {
     return true;
   };
 
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    const store = useStudio.getState();
+    if (e.button !== 0 || store.placingKey || !updateHover(e)) return;
+    const print = printAtPoint(designs, interaction.hover.point, interaction.hover.normal);
+    if (!print) return;
+    e.stopPropagation();
+    store.select(print.id);
+    if (print.locked) return;
+    interaction.drag = { id: print.id, moved: false };
+    store.setInteracting(true);
+  };
+
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!updateHover(e)) return;
+    if (!interaction.drag && !useStudio.getState().placingKey) {
+      const over = printAtPoint(designs, interaction.hover.point, interaction.hover.normal);
+      document.body.style.cursor = over ? (over.locked ? 'pointer' : 'grab') : '';
+    }
     const drag = interaction.drag;
     if (drag) {
       const store = useStudio.getState();
@@ -102,6 +165,9 @@ export function GarmentMesh({ garment, build, children }: Props) {
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     if (e.delta > 4) return; // it was an orbit drag
     const store = useStudio.getState();
+    if (!store.placingKey && updateHover(e as unknown as ThreeEvent<PointerEvent>)) {
+      if (printAtPoint(designs, interaction.hover.point, interaction.hover.normal)) return; // selected on press
+    }
     if (store.placingKey && updateHover(e as unknown as ThreeEvent<PointerEvent>)) {
       const asset = getAsset(store.placingKey);
       if (!asset) return;
@@ -137,8 +203,12 @@ export function GarmentMesh({ garment, build, children }: Props) {
         ref={bodyRef}
         geometry={build.body}
         material={viewMode === 'clay' ? clayBody : fabric}
+        onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerLeave={() => (interaction.hover.valid = false)}
+        onPointerLeave={() => {
+          interaction.hover.valid = false;
+          if (!interaction.drag) document.body.style.cursor = '';
+        }}
         onClick={onClick}
       >
         {children}
