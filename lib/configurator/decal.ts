@@ -4,7 +4,8 @@ import type { GarmentBuild } from './garment-geometry';
 import { decalPose, Placement } from './surface';
 import { DESIGN_BASE_WIDTH } from './store';
 
-export const DECAL_DEPTH = 0.06;
+/** Export-only decals: deep enough to cover curved sides (front-facing filter excludes the back panel). */
+export const DECAL_DEPTH = 0.3;
 
 export function designSize(placement: Placement, aspect: number): { w: number; h: number } {
   const w = DESIGN_BASE_WIDTH * placement.scale;

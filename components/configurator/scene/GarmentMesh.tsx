@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { ThreeEvent } from '@react-three/fiber';
+import { ThreeEvent, useThree } from '@react-three/fiber';
 import { getAsset } from '@/lib/configurator/assets';
 import { getRibNormalMap, makeFabricMaterial, makeGarmentNormalMap, makeKnitNormalMap } from '@/lib/configurator/fabric';
 import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
@@ -21,10 +21,12 @@ const WHITE = new THREE.Color('#ffffff');
 export const clayMaterial = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0 });
 
 /** Prints are projected inside the garment material, so they need the garment's own hit point to be picked. */
-function useGarmentPrints(materials: THREE.MeshStandardMaterial[]) {
+function useGarmentPrints(materials: THREE.MeshStandardMaterial[], build: GarmentBuild) {
+  const gl = useThree((s) => s.gl);
   const items = useStudio((s) => s.items);
   const designs = useMemo(() => items.filter((i): i is DesignItem => i.kind === 'design'), [items]);
   const layer = useMemo(() => new PrintLayer(), []);
+  useEffect(() => () => layer.dispose(), [layer]);
   const [loadedVersion, setLoadedVersion] = useState(0);
 
   useEffect(() => {
@@ -39,7 +41,8 @@ function useGarmentPrints(materials: THREE.MeshStandardMaterial[]) {
       if (texture) inputs.push({ item, texture });
     }
     layer.update(inputs);
-  }, [layer, designs, loadedVersion]);
+    layer.renderDepth(gl, build.body);
+  }, [layer, designs, loadedVersion, gl, build]);
 
   // Free artwork no longer used by any print (undo history keeps srcs alive via the snapshots it restores).
   useEffect(() => {
@@ -88,7 +91,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
     [garment],
   );
   const printMaterials = useMemo(() => [fabric, clayBody], [fabric, clayBody]);
-  const designs = useGarmentPrints(printMaterials);
+  const designs = useGarmentPrints(printMaterials, build);
   const collarFabric = useMemo(() => {
     const m = makeFabricMaterial('#ffffff', getRibNormalMap());
     m.vertexColors = false;
@@ -133,7 +136,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     const store = useStudio.getState();
     if (e.button !== 0 || store.placingKey || !updateHover(e)) return;
-    const print = printAtPoint(designs, interaction.hover.point, interaction.hover.normal);
+    const print = printAtPoint(designs, interaction.hover.point, interaction.hover.normal, build);
     if (!print) return;
     e.stopPropagation();
     store.select(print.id);
@@ -145,7 +148,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!updateHover(e)) return;
     if (!interaction.drag && !useStudio.getState().placingKey) {
-      const over = printAtPoint(designs, interaction.hover.point, interaction.hover.normal);
+      const over = printAtPoint(designs, interaction.hover.point, interaction.hover.normal, build);
       document.body.style.cursor = over ? (over.locked ? 'pointer' : 'grab') : '';
     }
     const drag = interaction.drag;
@@ -166,7 +169,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
     if (e.delta > 4) return; // it was an orbit drag
     const store = useStudio.getState();
     if (!store.placingKey && updateHover(e as unknown as ThreeEvent<PointerEvent>)) {
-      if (printAtPoint(designs, interaction.hover.point, interaction.hover.normal)) return; // selected on press
+      if (printAtPoint(designs, interaction.hover.point, interaction.hover.normal, build)) return; // selected on press
     }
     if (store.placingKey && updateHover(e as unknown as ThreeEvent<PointerEvent>)) {
       const asset = getAsset(store.placingKey);
