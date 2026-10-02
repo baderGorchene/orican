@@ -720,6 +720,168 @@
   cursor: pointer;
 }
 
+/* ---------- Model editor ---------- */
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+  background: #e4e4e4;
+}
+
+.tab {
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.tabActive {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.nudgeRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nudge {
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  grid-template-rows: repeat(3, 30px);
+  gap: 3px;
+}
+
+.nudgeBtn {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.nudgeBtn:active {
+  background: #ececec;
+}
+
+.nudgeCenter {
+  width: 6px;
+  height: 6px;
+  margin: auto;
+  border-radius: 50%;
+  background: var(--gray-pill);
+}
+
+.nudgeSteps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.secondaryBtn {
+  width: 100%;
+  height: 36px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.drawerFooter {
+  position: sticky;
+  bottom: -18px;
+  margin: 0 -18px -18px;
+  padding: 14px 18px 18px;
+  background: var(--panel);
+  border-top: 1px solid var(--panel-line);
+}
+
+.confirmBtn {
+  width: 100%;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 21px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirmBtn:hover {
+  filter: brightness(1.08);
+}
+
+/* Floating actions for the selected 3D model */
+.selectionBar {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 26px;
+  background: rgba(242, 242, 242, 0.96);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+}
+
+.selectionBar button {
+  height: 38px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: none;
+  border-radius: 19px;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.selectionBar button:hover {
+  background: #e4e4e4;
+}
+
+.selectionBar .selectionPrimary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.selectionBar .selectionPrimary:hover {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
 /* ---------- Small screens: sidebar becomes a bottom sheet ---------- */
 
 @media (max-width: 820px) {

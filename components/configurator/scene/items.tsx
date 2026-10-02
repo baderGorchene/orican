@@ -3,12 +3,12 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
-import { getAsset } from '@/lib/configurator/assets';
-import { buildDecalGeometry } from '@/lib/configurator/decal';
+import { buildDecalGeometry, designSize } from '@/lib/configurator/decal';
+import { makeKnitNormalMap } from '@/lib/configurator/fabric';
 import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
-import { interaction } from '@/lib/configurator/placement';
-import { AccessoryItem, DesignItem, StudioItem, useStudio } from '@/lib/configurator/store';
-import { fitAttachment } from '@/lib/configurator/surface';
+import { disposeFilteredObject, makeFilteredObject, updateFilterUniforms } from '@/lib/configurator/model-edit';
+import { accessoryLayout, interaction } from '@/lib/configurator/placement';
+import { AccessoryItem, DesignItem, PrintFinish, StudioItem, useStudio } from '@/lib/configurator/store';
 import { clayMaterial } from './GarmentMesh';
 
 /** Select on press; start a surface drag unless the item is locked. */
@@ -30,6 +30,8 @@ function itemPointerHandlers(item: StudioItem) {
 }
 
 // ---------------------------------------------------------------------------
+// Prints
+// ---------------------------------------------------------------------------
 
 function useImageTexture(src: string) {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
@@ -46,6 +48,36 @@ function useImageTexture(src: string) {
   return texture;
 }
 
+/** Knit size in meters: the print shows the fabric's knit through the ink. */
+const KNIT_TILE_M = 0.006;
+let knitBase: THREE.Texture | null = null;
+
+/** Soft height map from the artwork's alpha, for raised (puff) prints. */
+function alphaBumpMap(texture: THREE.Texture): THREE.Texture | null {
+  const img = texture.image as HTMLImageElement | undefined;
+  if (!img?.width) return null;
+  const k = Math.min(1, 1024 / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(img.width * k);
+  canvas.height = Math.round(img.height * k);
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.filter = 'blur(3px) brightness(0) invert(1)';
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.NoColorSpace;
+  return tex;
+}
+
+const FINISH: Record<PrintFinish, { roughness: number; metalness: number; knit: number; envMapIntensity: number }> = {
+  dtg: { roughness: 0.92, metalness: 0, knit: 0.55, envMapIntensity: 1 },
+  screen: { roughness: 0.7, metalness: 0, knit: 0.3, envMapIntensity: 1 },
+  puff: { roughness: 0.85, metalness: 0, knit: 0, envMapIntensity: 1 },
+  foil: { roughness: 0.22, metalness: 1, knit: 0.15, envMapIntensity: 1.8 },
+  vinyl: { roughness: 0.32, metalness: 0, knit: 0.08, envMapIntensity: 1.2 },
+};
+
 export const DesignDecal = memo(function DesignDecal({ item, build }: { item: DesignItem; build: GarmentBuild }) {
   const texture = useImageTexture(item.src);
   const { position, normal, yaw, scale } = item.placement;
@@ -57,21 +89,51 @@ export const DesignDecal = memo(function DesignDecal({ item, build }: { item: De
   );
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  const material = useMemo(
-    () =>
-      texture &&
-      new THREE.MeshStandardMaterial({
-        map: texture,
-        transparent: true,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -4,
-        roughness: 0.82,
-        metalness: 0,
-      }),
-    [texture],
+  const { w, h } = designSize(item.placement, item.aspect);
+  const finish = item.finish ?? 'dtg';
+
+  const material = useMemo(() => {
+    if (!texture) return null;
+    const f = FINISH[finish];
+    const m = new THREE.MeshStandardMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      roughness: f.roughness,
+      metalness: f.metalness,
+      envMapIntensity: f.envMapIntensity,
+    });
+    if (finish === 'puff') {
+      const bump = alphaBumpMap(texture);
+      if (bump) {
+        m.bumpMap = bump;
+        m.bumpScale = 6;
+      }
+    } else if (f.knit > 0) {
+      if (!knitBase) knitBase = makeKnitNormalMap(1);
+      const knit = knitBase.clone();
+      knit.needsUpdate = true;
+      m.normalMap = knit;
+      m.normalScale.set(f.knit, f.knit);
+    }
+    return m;
+  }, [texture, finish]);
+
+  // Keep the knit at its physical size as the print is resized.
+  useEffect(() => {
+    material?.normalMap?.repeat.set(w / KNIT_TILE_M, h / KNIT_TILE_M);
+  }, [material, w, h]);
+
+  useEffect(
+    () => () => {
+      material?.bumpMap?.dispose();
+      material?.normalMap?.dispose();
+      material?.dispose();
+    },
+    [material],
   );
-  useEffect(() => () => material?.dispose(), [material]);
 
   if (!material) return null;
   return (
@@ -80,40 +142,50 @@ export const DesignDecal = memo(function DesignDecal({ item, build }: { item: De
 });
 
 // ---------------------------------------------------------------------------
-
-function cloneAsset(source: THREE.Object3D, clay: boolean): THREE.Object3D {
-  const copy = source.clone(true);
-  if (clay) {
-    copy.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (mesh.isMesh) mesh.material = clayMaterial;
-    });
-  }
-  return copy;
-}
+// 3D attachments
+// ---------------------------------------------------------------------------
 
 export const AccessoryNode = memo(function AccessoryNode({ item, build }: { item: AccessoryItem; build: GarmentBuild }) {
   const clay = useStudio((s) => s.viewMode === 'clay');
-  const asset = getAsset(item.assetKey);
-  const object = useMemo(() => (asset ? cloneAsset(asset.object, clay) : null), [asset, clay]);
+  const fit = useMemo(() => accessoryLayout(build, item), [build, item]);
+  const asset = fit?.asset;
+  const materialMode = item.filters.material;
 
-  const pose = useMemo(() => {
+  const object = useMemo(() => {
     if (!asset) return null;
-    const { hx, hy } = asset.footprint;
-    const s = item.placement.scale;
-    return fitAttachment(build.bvh, build.body, item.placement, { hx: hx * s, hy: hy * s });
-  }, [asset, build, item.placement]);
+    if (clay) {
+      const copy = asset.object.clone(true);
+      copy.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = clayMaterial;
+      });
+      return copy;
+    }
+    return makeFilteredObject(asset.object, { ...item.filters, material: materialMode });
+    // Filter values are pushed as uniforms below; only the material mode needs new clones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asset, clay, materialMode]);
 
-  if (!object || !pose) return null;
+  useEffect(() => {
+    if (object) updateFilterUniforms(object, item.filters);
+  }, [object, item.filters]);
+
+  useEffect(() => () => {
+    if (object && !clay) disposeFilteredObject(object);
+  }, [object, clay]);
+
+  if (!object || !fit) return null;
   return (
     <group
-      position={pose.position}
-      quaternion={pose.quaternion}
+      position={fit.pose.position}
+      quaternion={fit.pose.quaternion}
       scale={item.placement.scale}
       visible={item.visible}
       {...itemPointerHandlers(item)}
     >
-      <primitive object={object} />
+      <group matrix={fit.layout.matrix} matrixAutoUpdate={false}>
+        <primitive object={object} />
+      </group>
     </group>
   );
 });

@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { printAccessory } from '@/lib/configurator/bake';
+import { nudgeItem } from '@/lib/configurator/placement';
 import { ACCESSORY_SCALE_RANGE, DESIGN_SCALE_RANGE, useStudio } from '@/lib/configurator/store';
 import { AdvancedDrawer } from './AdvancedDrawer';
 import { Sidebar } from './Sidebar';
@@ -35,6 +37,19 @@ function useShortcuts() {
 
       const item = s.items.find((i) => i.id === s.selectedId);
       if (!item || item.locked) return;
+      const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+      if (arrows[e.key]) {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.001 : 0.005;
+        s.checkpoint();
+        nudgeItem(item.id, arrows[e.key][0] * step, arrows[e.key][1] * step);
+        return;
+      }
+      if (e.key === 'Enter' && item.kind === 'accessory' && !target.closest('button, a')) {
+        e.preventDefault();
+        printAccessory(item.id);
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         s.removeItem(item.id);

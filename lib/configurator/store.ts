@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { DEFAULT_GARMENT_ID } from './garments';
+import type { ModelFilters, ModelTransform } from './model-edit';
 import { Placement } from './surface';
 
 export interface BaseItem {
@@ -10,18 +11,25 @@ export interface BaseItem {
   placement: Placement;
 }
 
+export type PrintFinish = 'dtg' | 'screen' | 'puff' | 'foil' | 'vinyl';
+
 /** A printed artwork projected onto the fabric. */
 export interface DesignItem extends BaseItem {
   kind: 'design';
   src: string;
   /** width / height of the artwork */
   aspect: number;
+  finish: PrintFinish;
+  /** Set when the print was baked from a 3D attachment, so it can go back to 3D editing. */
+  baked?: Pick<AccessoryItem, 'assetKey' | 'name' | 'placement' | 'transform' | 'filters'>;
 }
 
 /** A rigid 3D attachment (hardware or upload). */
 export interface AccessoryItem extends BaseItem {
   kind: 'accessory';
   assetKey: string;
+  transform: ModelTransform;
+  filters: ModelFilters;
 }
 
 export type StudioItem = DesignItem | AccessoryItem;
@@ -32,9 +40,9 @@ export type CameraMotion = 'none' | 'orbit' | 'sweep';
 export type CameraView = 'front' | 'back' | 'left' | 'right' | 'three-quarter';
 
 export const DESIGN_BASE_WIDTH = 0.24; // meters at scale 1
-export const DESIGN_SCALE_RANGE: [number, number] = [0.25, 2.5];
-export const ACCESSORY_SCALE_RANGE: [number, number] = [0.5, 2];
-export const CLEARANCE_RANGE: [number, number] = [0.0005, 0.005];
+export const DESIGN_SCALE_RANGE: [number, number] = [0.05, 2.5];
+export const ACCESSORY_SCALE_RANGE: [number, number] = [0.25, 4];
+export const CLEARANCE_RANGE: [number, number] = [0.0005, 0.03];
 export const DEFAULT_CLEARANCE = 0.0015;
 
 interface Snapshot {
@@ -74,6 +82,8 @@ interface StudioState extends Snapshot {
   updateItem: (id: string, patch: Partial<Omit<DesignItem, 'kind'>> | Partial<Omit<AccessoryItem, 'kind'>>) => void;
   updatePlacement: (id: string, patch: Partial<Placement>) => void;
   removeItem: (id: string) => void;
+  /** Swap an item for another in the same layer slot (one undo step), selecting the new one. */
+  replaceItem: (id: string, item: StudioItem) => void;
   select: (id: string | null) => void;
   setPlacing: (key: string | null) => void;
   setInteracting: (v: boolean) => void;
@@ -151,6 +161,10 @@ export const useStudio = create<StudioState>()((set, get) => ({
     set((s) => ({
       items: s.items.map((i) => (i.id === id ? { ...i, placement: { ...i.placement, ...patch } } : i)),
     })),
+  replaceItem: (id, item) => {
+    get().checkpoint();
+    set((s) => ({ items: s.items.map((i) => (i.id === id ? item : i)), selectedId: item.id }));
+  },
   removeItem: (id) => {
     get().checkpoint();
     set((s) => ({ items: s.items.filter((i) => i.id !== id), selectedId: s.selectedId === id ? null : s.selectedId }));

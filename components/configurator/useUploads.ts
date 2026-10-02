@@ -70,6 +70,7 @@ export function useUploads() {
         name: file.name,
         src,
         aspect,
+        finish: 'dtg',
         visible: true,
         locked: false,
         placement: { ...spot, yaw: 0, scale: 1, offset: 0 },

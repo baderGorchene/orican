@@ -9,6 +9,7 @@ import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
 import type { Garment3D } from '@/lib/configurator/garments';
 import { interaction } from '@/lib/configurator/placement';
 import { sceneRefs } from '@/lib/configurator/scene-refs';
+import { DEFAULT_FILTERS, DEFAULT_TRANSFORM } from '@/lib/configurator/model-edit';
 import { DEFAULT_CLEARANCE, newId, useStudio } from '@/lib/configurator/store';
 import { interpolatedNormal, toVec3 } from '@/lib/configurator/surface';
 
@@ -110,6 +111,8 @@ export function GarmentMesh({ garment, build, children }: Props) {
         kind: 'accessory',
         name: asset.name,
         assetKey: asset.key,
+        transform: DEFAULT_TRANSFORM,
+        filters: DEFAULT_FILTERS,
         visible: true,
         locked: false,
         placement: {
@@ -121,6 +124,8 @@ export function GarmentMesh({ garment, build, children }: Props) {
         },
       }, !keepPlacing);
       if (!keepPlacing) store.setPlacing(null);
+      // Uploaded models go straight into the model editor.
+      if (!keepPlacing && asset.key.startsWith('upload:')) store.setAdvancedOpen(true);
       return;
     }
     store.select(null);

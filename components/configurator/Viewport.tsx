@@ -3,7 +3,8 @@
 import '@/lib/configurator/bvh-setup';
 import { useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { Expand, Shrink } from 'lucide-react';
+import { Expand, Printer, Shrink, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { printAccessory } from '@/lib/configurator/bake';
 import { getAsset } from '@/lib/configurator/assets';
 import { backgroundCss, isDarkBackground } from '@/lib/configurator/backgrounds';
 import { getGarment } from '@/lib/configurator/garments';
@@ -52,6 +53,28 @@ function Toast() {
   return (
     <div className={styles.toast} role="status">
       {toast.message}
+    </div>
+  );
+}
+
+/** Quick actions for a selected 3D model: confirm its position by printing it onto the garment. */
+function SelectionBar() {
+  const selected = useStudio((s) => s.items.find((i) => i.id === s.selectedId));
+  const interacting = useStudio((s) => s.interacting);
+  const recording = useStudio((s) => s.recording);
+  if (!selected || selected.kind !== 'accessory' || interacting || recording) return null;
+  const store = useStudio.getState;
+  return (
+    <div className={styles.selectionBar}>
+      <button onClick={() => store().setAdvancedOpen(true)}>
+        <SlidersHorizontal size={15} /> Edit model
+      </button>
+      <button onClick={() => store().removeItem(selected.id)} aria-label="Delete">
+        <Trash2 size={15} />
+      </button>
+      <button className={styles.selectionPrimary} onClick={() => printAccessory(selected.id)}>
+        <Printer size={15} /> Confirm &amp; print
+      </button>
     </div>
   );
 }
@@ -131,6 +154,7 @@ export function Viewport() {
 
       <PlacingHint />
       <LoadingHint />
+      <SelectionBar />
       <StatusBar dark={dark} />
       <Toast />
       {dragOver && <div className={styles.dropOverlay}>Drop an image to print it, or a .glb to attach it</div>}

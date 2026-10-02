@@ -3,9 +3,9 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent, useThree } from '@react-three/fiber';
-import { getAsset } from '@/lib/configurator/assets';
 import { designSize } from '@/lib/configurator/decal';
 import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
+import { accessoryLayout } from '@/lib/configurator/placement';
 import { NO_EXPORT, sceneRefs } from '@/lib/configurator/scene-refs';
 import { ACCESSORY_SCALE_RANGE, DESIGN_SCALE_RANGE, StudioItem, useStudio } from '@/lib/configurator/store';
 import { decalPose, fitAttachment, surfaceFrame } from '@/lib/configurator/surface';
@@ -26,9 +26,9 @@ export function TransformGizmo({ item, build }: { item: StudioItem; build: Garme
       const { w, h } = designSize(p, item.aspect);
       return { pose: decalPose(p), radius: Math.hypot(w, h) / 2 + 0.01, rect: { w, h } };
     }
-    const asset = getAsset(item.assetKey);
-    const fp = asset?.footprint ?? { hx: 0.01, hy: 0.01 };
-    const pose = fitAttachment(build.bvh, build.body, p, { hx: fp.hx * p.scale, hy: fp.hy * p.scale });
+    const fit = accessoryLayout(build, item);
+    const fp = fit?.layout.footprint ?? { hx: 0.01, hy: 0.01 };
+    const pose = fit?.pose ?? fitAttachment(build.bvh, build.body, p, { hx: fp.hx * p.scale, hy: fp.hy * p.scale });
     return { pose, radius: Math.max(fp.hx, fp.hy) * p.scale * 1.4 + 0.006, rect: null };
   }, [item, build]);
 
