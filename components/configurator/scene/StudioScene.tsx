@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Environment, Lightformer } from '@react-three/drei';
 import { recordClock } from '@/lib/configurator/export';
-import { buildGarmentGeometry } from '@/lib/configurator/garment-geometry';
-import { getGarment } from '@/lib/configurator/garments';
+import { loadGarmentBuild } from '@/lib/configurator/garment-build';
+import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
+import { Garment3D, getGarment } from '@/lib/configurator/garments';
 import { interaction, resnapItems } from '@/lib/configurator/placement';
 import { sceneRefs } from '@/lib/configurator/scene-refs';
 import { useStudio } from '@/lib/configurator/store';
@@ -60,8 +61,22 @@ export function StudioScene() {
   const placing = useStudio((s) => s.placingKey !== null);
   const root = useRef<THREE.Group>(null);
 
-  const garment = getGarment(garmentId);
-  const build = useMemo(() => buildGarmentGeometry(garment), [garment]);
+  // The previous garment stays on screen until the next one has loaded.
+  const [loaded, setLoaded] = useState<{ garment: Garment3D; build: GarmentBuild } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const g = getGarment(garmentId);
+    const store = useStudio.getState();
+    store.setGarmentLoading(true);
+    loadGarmentBuild(g)
+      .then((build) => !cancelled && setLoaded({ garment: g, build }))
+      .catch(() => !cancelled && useStudio.getState().showToast(`Could not load ${g.name}`))
+      .finally(() => !cancelled && useStudio.getState().setGarmentLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [garmentId]);
 
   useEffect(() => {
     sceneRefs.gl = gl;
@@ -69,15 +84,13 @@ export function StudioScene() {
     sceneRefs.camera = camera;
   }, [gl, scene, camera]);
 
+  // Builds are cached by loadGarmentBuild, so they are not disposed on switch.
   useEffect(() => {
+    if (!loaded) return;
     sceneRefs.root = root.current;
-    sceneRefs.garment = build;
+    sceneRefs.garment = loaded.build;
     resnapItems();
-    return () => {
-      build.body.dispose();
-      build.collar?.dispose();
-    };
-  }, [build]);
+  }, [loaded]);
 
   // End item drags even when the pointer is released off the garment.
   useEffect(() => {
@@ -103,19 +116,26 @@ export function StudioScene() {
   });
 
   const selected = items.find((i) => i.id === selectedId);
+  const build = loaded?.build;
 
   return (
     <>
       <StudioLights />
       <group ref={root}>
-        <GarmentMesh garment={garment} build={build}>
-          {items.map((item) => (item.kind === 'design' ? <DesignDecal key={item.id} item={item} build={build} /> : null))}
-        </GarmentMesh>
-        {items.map((item) => (item.kind === 'accessory' ? <AccessoryNode key={item.id} item={item} build={build} /> : null))}
-        <PlacementGhost build={build} />
-        {selected && selected.visible && !selected.locked && !recording && !placing && <TransformGizmo item={selected} build={build} />}
+        {loaded && build && (
+          <>
+            <GarmentMesh garment={loaded.garment} build={build}>
+              {items.map((item) => (item.kind === 'design' ? <DesignDecal key={item.id} item={item} build={build} /> : null))}
+            </GarmentMesh>
+            {items.map((item) => (item.kind === 'accessory' ? <AccessoryNode key={item.id} item={item} build={build} /> : null))}
+            <PlacementGhost build={build} />
+            {selected && selected.visible && !selected.locked && !recording && !placing && (
+              <TransformGizmo item={selected} build={build} />
+            )}
+          </>
+        )}
       </group>
-      <CameraRig garmentSize={build.size} />
+      {build && <CameraRig garmentSize={build.size} />}
       <StatsProbe />
     </>
   );

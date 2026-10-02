@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Garment3D } from './garments';
+import { ProceduralGarment } from './garments';
 
 /**
  * Fabric detail textures, generated at runtime:
@@ -53,7 +53,7 @@ function paintRibs(ctx: CanvasRenderingContext2D, w: number, h: number, period: 
   }
 }
 
-export function makeGarmentNormalMap(g: Garment3D): THREE.Texture {
+export function makeGarmentNormalMap(g: ProceduralGarment): THREE.Texture {
   const height = document.createElement('canvas');
   height.width = PANEL * 2;
   height.height = PANEL;
@@ -124,8 +124,37 @@ export function getRibNormalMap(): THREE.Texture {
   return tex;
 }
 
-export function makeFabricMaterial(color: string, normalMap: THREE.Texture): THREE.MeshPhysicalMaterial {
+/**
+ * Tiling jersey-knit normal map for model garments. `tile` is the size of one
+ * texture tile in the model's UV units (4 wales per tile).
+ */
+export function makeKnitNormalMap(tile: number): THREE.Texture {
+  const height = document.createElement('canvas');
+  height.width = 64;
+  height.height = 64;
+  const ctx = height.getContext('2d')!;
+  paintRibs(ctx, 64, 64, 16, 70);
+  // faint horizontal course lines
+  for (let y = 0; y < 64; y += 8) {
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(0, y, 64, 1);
+  }
+  const tex = new THREE.CanvasTexture(heightToNormal(height, 2.5));
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  tex.repeat.set(1 / tile, 1 / tile);
+  return tex;
+}
+
+export function makeFabricMaterial(
+  color: string,
+  normalMap: THREE.Texture,
+  opts: { vertexColors?: boolean; doubleSided?: boolean } = {},
+): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
+    side: opts.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
     color,
     roughness: 0.88,
     metalness: 0,
@@ -134,6 +163,6 @@ export function makeFabricMaterial(color: string, normalMap: THREE.Texture): THR
     sheenColor: new THREE.Color('#ffffff'),
     normalMap,
     normalScale: new THREE.Vector2(0.55, 0.55),
-    vertexColors: true,
+    vertexColors: opts.vertexColors ?? true,
   });
 }

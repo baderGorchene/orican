@@ -57,6 +57,7 @@ interface StudioState extends Snapshot {
   cameraRequest: { view: CameraView; nonce: number } | null;
   advancedOpen: boolean;
   recording: boolean;
+  garmentLoading: boolean;
   toast: { message: string; nonce: number } | null;
   stats: { fps: number; triangles: number };
   past: Snapshot[];
@@ -84,6 +85,7 @@ interface StudioState extends Snapshot {
   requestView: (view: CameraView) => void;
   setAdvancedOpen: (v: boolean) => void;
   setRecording: (v: boolean) => void;
+  setGarmentLoading: (v: boolean) => void;
   showToast: (message: string) => void;
   setStats: (stats: StudioState['stats']) => void;
 }
@@ -107,6 +109,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
   cameraRequest: null,
   advancedOpen: false,
   recording: false,
+  garmentLoading: false,
   toast: null,
   stats: { fps: 0, triangles: 0 },
   past: [],
@@ -163,6 +166,7 @@ export const useStudio = create<StudioState>()((set, get) => ({
   requestView: (view) => set({ cameraRequest: { view, nonce: Date.now() }, cameraMotion: 'none' }),
   setAdvancedOpen: (v) => set({ advancedOpen: v }),
   setRecording: (v) => set({ recording: v }),
+  setGarmentLoading: (v) => set({ garmentLoading: v }),
   showToast: (message) => set({ toast: { message, nonce: Date.now() } }),
   setStats: (stats) => set({ stats }),
 }));

@@ -27,7 +27,8 @@ export function defaultSpot(): { position: Vec3; normal: Vec3 } {
   const h = g.hotspots.find((x) => x.id === 'center-chest') ?? g.hotspots.find((x) => x.side === 'front') ?? g.hotspots[0];
   const hit = h ? hotspotHit(h) : null;
   if (hit) return { position: toVec3(hit.point), normal: toVec3(hit.normal) };
-  return { position: [0, 0.1, g.depth], normal: [0, 0, 1] };
+  const front = sceneRefs.garment ? sceneRefs.garment.size.z / 2 : 0.1;
+  return { position: [0, 0.1, front], normal: [0, 0, 1] };
 }
 
 /** Re-projects every item onto the current garment (after a garment switch). */

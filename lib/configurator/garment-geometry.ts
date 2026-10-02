@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
-import { Garment3D } from './garments';
+import { ProceduralGarment } from './garments';
 
 /**
  * Procedural placeholder garments: a 2D outline is sampled on a grid, a
@@ -69,7 +69,7 @@ function drape(xm: number, ym: number, seed: number): number {
   return n * 0.011;
 }
 
-export function buildGarmentGeometry(g: Garment3D): GarmentBuild {
+export function buildGarmentGeometry(g: ProceduralGarment): GarmentBuild {
   const { w, h } = g.outline;
   const s = g.heightM / h; // meters per path unit
   const step = h / GRID_ROWS;

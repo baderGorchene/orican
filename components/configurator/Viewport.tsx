@@ -15,11 +15,26 @@ import { useUploads } from './useUploads';
 function StatusBar({ dark }: { dark: boolean }) {
   const garmentId = useStudio((s) => s.garmentId);
   const stats = useStudio((s) => s.stats);
+  const loading = useStudio((s) => s.garmentLoading);
+  const garment = getGarment(garmentId);
+  const credit = garment.credit;
   return (
     <div className={`${styles.statusBar} ${dark ? styles.statusDark : styles.statusLight}`}>
-      <span>Garment: {getGarment(garmentId).name}</span>
+      <span>Garment: {garment.name}{loading ? ' (loading…)' : ''}</span>
       <span>Polycount: {(stats.triangles / 1000).toFixed(1)}k</span>
       <span>FPS: {stats.fps}</span>
+      {credit && (
+        <span className={styles.credit}>
+          Model:{' '}
+          <a href={credit.url} target="_blank" rel="noreferrer">
+            “{credit.title}” by {credit.author}
+          </a>{' '}
+          ·{' '}
+          <a href={credit.licenseUrl} target="_blank" rel="noreferrer">
+            {credit.license}
+          </a>
+        </span>
+      )}
     </div>
   );
 }
@@ -39,6 +54,12 @@ function Toast() {
       {toast.message}
     </div>
   );
+}
+
+function LoadingHint() {
+  const loading = useStudio((s) => s.garmentLoading);
+  if (!loading) return null;
+  return <div className={styles.hintPill}>Loading garment…</div>;
 }
 
 function PlacingHint() {
@@ -109,6 +130,7 @@ export function Viewport() {
       </button>
 
       <PlacingHint />
+      <LoadingHint />
       <StatusBar dark={dark} />
       <Toast />
       {dragOver && <div className={styles.dropOverlay}>Drop an image to print it, or a .glb to attach it</div>}

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { ThreeEvent } from '@react-three/fiber';
 import { getAsset } from '@/lib/configurator/assets';
-import { getRibNormalMap, makeFabricMaterial, makeGarmentNormalMap } from '@/lib/configurator/fabric';
+import { getRibNormalMap, makeFabricMaterial, makeGarmentNormalMap, makeKnitNormalMap } from '@/lib/configurator/fabric';
 import type { GarmentBuild } from '@/lib/configurator/garment-geometry';
 import type { Garment3D } from '@/lib/configurator/garments';
 import { interaction } from '@/lib/configurator/placement';
@@ -13,9 +13,12 @@ import { DEFAULT_CLEARANCE, newId, useStudio } from '@/lib/configurator/store';
 import { interpolatedNormal, toVec3 } from '@/lib/configurator/surface';
 
 const noRaycast = () => null;
+const WHITE = new THREE.Color('#ffffff');
 
 export const clayMaterial = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0 });
-const clayBodyMaterial = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0, vertexColors: true });
+// Procedural garments carry baked edge occlusion in vertex colors; model garments render double-sided.
+const clayProcedural = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0, vertexColors: true });
+const clayModel = new THREE.MeshStandardMaterial({ color: '#d9d9d9', roughness: 0.75, metalness: 0, side: THREE.DoubleSide });
 
 interface Props {
   garment: Garment3D;
@@ -27,8 +30,18 @@ export function GarmentMesh({ garment, build, children }: Props) {
   const color = useStudio((s) => s.garmentColor);
   const viewMode = useStudio((s) => s.viewMode);
 
-  const normalMap = useMemo(() => makeGarmentNormalMap(garment), [garment]);
-  const fabric = useMemo(() => makeFabricMaterial('#ffffff', normalMap), [normalMap]);
+  const normalMap = useMemo(
+    () => (garment.source === 'model' ? makeKnitNormalMap(garment.knitTile) : makeGarmentNormalMap(garment)),
+    [garment],
+  );
+  const fabric = useMemo(
+    () =>
+      garment.source === 'model'
+        ? makeFabricMaterial('#ffffff', normalMap, { vertexColors: false, doubleSided: true })
+        : makeFabricMaterial('#ffffff', normalMap),
+    [garment, normalMap],
+  );
+  const clayBody = garment.source === 'model' ? clayModel : clayProcedural;
   const collarFabric = useMemo(() => {
     const m = makeFabricMaterial('#ffffff', getRibNormalMap());
     m.vertexColors = false;
@@ -44,6 +57,8 @@ export function GarmentMesh({ garment, build, children }: Props) {
   useEffect(() => {
     fabric.color.set(color);
     collarFabric.color.set(color);
+    // A pure-white sheen washes dark fabrics out to gray; tint it toward the garment color.
+    for (const m of [fabric, collarFabric]) m.sheenColor.set(color).lerp(WHITE, 0.4);
   }, [color, fabric, collarFabric]);
 
   useEffect(() => {
@@ -116,7 +131,7 @@ export function GarmentMesh({ garment, build, children }: Props) {
       <mesh
         ref={bodyRef}
         geometry={build.body}
-        material={viewMode === 'clay' ? clayBodyMaterial : fabric}
+        material={viewMode === 'clay' ? clayBody : fabric}
         onPointerMove={onPointerMove}
         onPointerLeave={() => (interaction.hover.valid = false)}
         onClick={onClick}
